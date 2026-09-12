@@ -7,7 +7,6 @@ from django.utils.translation import gettext_lazy as _
 
 class User(AbstractUser):
     class Role(models.TextChoices):
-        OWNER = "owner", _("یوزر اصلی")
         AGENCY_MANAGER = "agency_manager", _("مدیر املاک")
         RANGE_MANAGER = "range_manager", _("مدیر رنج")
         CONSULTANT = "consultant", _("مشاور")
@@ -36,15 +35,16 @@ class User(AbstractUser):
         verbose_name=_("نقش"),
     )
 
+    is_workspace_owner = models.BooleanField(
+        default=False,
+        verbose_name=_("یوزر اصلی مجموعه"),
+        help_text=_("مشخص می‌کند این کاربر خریدار و مالک اصلی فضای کاری است."),
+    )
+
     phone_number = models.CharField(
         max_length=20,
         blank=True,
         verbose_name=_("شماره موبایل"),
-    )
-
-    is_active = models.BooleanField(
-        default=True,
-        verbose_name=_("فعال"),
     )
 
     created_at = models.DateTimeField(

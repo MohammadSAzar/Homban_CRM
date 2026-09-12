@@ -27,6 +27,8 @@ THIRD_PARTY_APPS = [
 LOCAL_APPS = [
     "apps.organizations.apps.OrganizationsConfig",
     "apps.accounts.apps.AccountsConfig",
+    "apps.locations.apps.LocationsConfig",
+    "apps.ranges.apps.RangesConfig",
 ]
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS

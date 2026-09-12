@@ -5,10 +5,16 @@ from django.utils.translation import gettext_lazy as _
 
 
 class Workspace(models.Model):
+
     class CustomerType(models.TextChoices):
         AGENCY_MANAGER = "agency_manager", _("مدیر املاک")
         RANGE_MANAGER = "range_manager", _("مدیر رنج")
         CONSULTANT = "consultant", _("مشاور")
+
+    class RegionMode(models.TextChoices):
+        NONE = "none", _("بدون تفکیک منطقه")
+        CUSTOM = "custom", _("منطقه‌بندی اختصاصی")
+        DIVAR = "divar", _("منطقه‌بندی دیوار")
 
     id = models.UUIDField(
         primary_key=True,
@@ -48,6 +54,13 @@ class Workspace(models.Model):
     updated_at = models.DateTimeField(
         auto_now=True,
         verbose_name=_("آخرین بروزرسانی"),
+    )
+
+    region_mode = models.CharField(
+        max_length=20,
+        choices=RegionMode.choices,
+        default=RegionMode.CUSTOM,
+        verbose_name=_("نوع منطقه‌بندی"),
     )
 
     class Meta:
