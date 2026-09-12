@@ -1,0 +1,66 @@
+import uuid
+
+from django.contrib.auth.models import AbstractUser
+from django.db import models
+from django.utils.translation import gettext_lazy as _
+
+
+class User(AbstractUser):
+    class Role(models.TextChoices):
+        OWNER = "owner", _("یوزر اصلی")
+        AGENCY_MANAGER = "agency_manager", _("مدیر املاک")
+        RANGE_MANAGER = "range_manager", _("مدیر رنج")
+        CONSULTANT = "consultant", _("مشاور")
+        SECRETARY = "secretary", _("منشی")
+        ADMIN = "admin", _("ادمین")
+
+    id = models.UUIDField(
+        primary_key=True,
+        default=uuid.uuid4,
+        editable=False,
+        verbose_name=_("شناسه"),
+    )
+
+    workspace = models.ForeignKey(
+        "organizations.Workspace",
+        on_delete=models.CASCADE,
+        related_name="users",
+        verbose_name=_("مجموعه"),
+        null=True,
+        blank=True,
+    )
+
+    role = models.CharField(
+        max_length=30,
+        choices=Role.choices,
+        verbose_name=_("نقش"),
+    )
+
+    phone_number = models.CharField(
+        max_length=20,
+        blank=True,
+        verbose_name=_("شماره موبایل"),
+    )
+
+    is_active = models.BooleanField(
+        default=True,
+        verbose_name=_("فعال"),
+    )
+
+    created_at = models.DateTimeField(
+        auto_now_add=True,
+        verbose_name=_("تاریخ ایجاد"),
+    )
+
+    updated_at = models.DateTimeField(
+        auto_now=True,
+        verbose_name=_("آخرین بروزرسانی"),
+    )
+
+    class Meta:
+        verbose_name = _("کاربر")
+        verbose_name_plural = _("کاربران")
+
+    def __str__(self):
+        return self.get_full_name() or self.username
+
