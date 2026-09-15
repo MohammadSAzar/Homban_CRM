@@ -1,6 +1,6 @@
 # Homban Current Implementation State
 
-This document describes the implementation after the baseline cleanup on 2026-09-15.
+This document describes the baseline and customer JWT authentication foundation on 2026-09-15.
 
 ## Repository
 Root folder:
@@ -14,6 +14,7 @@ Git is initialized and commits already exist.
 - Python 3.10.11
 - Django 5.2.x
 - Django REST Framework installed
+- djangorestframework-simplejwt 5.5.1 (PyJWT 2.14.0) installed
 - django-filter installed
 - python-dotenv installed
 - mysqlclient installed
@@ -146,7 +147,7 @@ assignment hook. Broader workspace immutability and bulk-write policies remain u
 ## Tests
 All four apps use `tests/` packages with correctly named `__init__.py` files.
 `pytest.ini` collects `test_*.py`; there are no conflicting app-level `tests.py` files.
-The default suite contains 18 test cases, including parameterized cases.
+The default suite contains 44 test cases, including parameterized cases.
 
 Tests already cover at least:
 - Workspace creation
@@ -158,18 +159,42 @@ Tests already cover at least:
 - Cross-workspace rejection and rollback for add/set/set(clear=True)
 - Repeated assignment and removal/clearing of region links
 
-API and permission test modules are placeholders; there is no API/permission test
-coverage yet. The existing suite does not comprehensively cover all model rules.
+Authentication API tests cover login, invalid credentials, current-user response
+allowlisting, anonymous denial, current database role/workspace state, inactive users
+and workspaces, removed membership/deleted users, refresh rotation/reuse rejection,
+invalid/expired/wrong-type tokens, missing/invalid identity claims, and required fields.
+The existing suite does not comprehensively cover all model rules or future role policies.
 
 ## API and deployment status
-Only Django's `/admin/` route exists. Application admin/view modules are placeholders;
-business APIs, serializers, and the custom customer-facing frontend are not implemented.
-DRF defaults to authenticated access, but workspace/role/object API policies are future
-work. Production settings have an empty `ALLOWED_HOSTS`; deployment remains incomplete.
+Customer authentication endpoints:
+- `POST /api/v1/auth/login/`: username/password -> access and refresh tokens
+- `POST /api/v1/auth/refresh/`: refresh token -> access and rotated refresh tokens
+- `GET /api/v1/auth/me/`: current-user profile only
+
+DRF defaults to database-backed customer JWT authentication and `IsAuthenticated`.
+Login and refresh are public (no prior authentication required). All three paths
+require an active user with membership in an active workspace. Workspace-less
+company/control-plane users are excluded, including staff/superusers without membership.
+Access requests load the user and workspace together. Tokens contain identity and
+standard token metadata only; roles and workspace data are read from the database.
+The profile allowlist is id, username, first_name, last_name, phone_number, role,
+role_display (Persian), is_workspace_owner, workspace_id, and workspace_name.
+
+Access lifetime is five minutes; refresh lifetime is one day, renewed on rotation.
+SimpleJWT's blacklist app rejects previously rotated refresh tokens. Its bundled
+migrations must be applied using `python manage.py migrate` in each environment;
+there are no new Homban model migrations. Schedule `python manage.py flushexpiredtokens`
+for production housekeeping. Clients should serialize refresh requests; rotation is
+not an absolute session-duration limit or a concurrent replay-prevention system.
+
+Django's `/admin/` still uses its existing session authentication. Business record
+APIs, role/object policies, and the customer frontend remain future work. Production
+deployment is incomplete (`ALLOWED_HOSTS` is empty). HTTPS, client token storage,
+login rate limiting, and signing-key operations need deployment decisions. This
+foundation uses Django's environment-backed secret as SimpleJWT's default signing key.
 
 ## Not yet implemented / not confirmed as implemented
 Treat these as future work unless repository inspection proves otherwise:
-- JWT authentication API
 - Full permission framework
 - User-management API
 - File model/API

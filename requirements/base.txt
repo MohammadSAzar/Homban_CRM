@@ -1,5 +1,6 @@
 Django>=5.2,<5.3
 djangorestframework
+djangorestframework-simplejwt>=5.5.1,<6
 django-filter
 python-dotenv
 mysqlclient
