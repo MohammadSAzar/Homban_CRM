@@ -7,7 +7,8 @@ Homban is a Persian, mobile-first real estate CRM web application.
 - Python 3.10
 - Django 5.2 LTS
 - Django REST Framework
-- MySQL planned for production
+- MySQL with utf8mb4 is used for development and tests (test_homban_db).
+- Production deployment remains future/incomplete.
 
 ## Architecture
 
