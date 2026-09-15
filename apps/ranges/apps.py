@@ -6,3 +6,6 @@ class RangesConfig(AppConfig):
     default_auto_field = "django.db.models.BigAutoField"
     name = "apps.ranges"
     verbose_name = _("رنج‌ها و تیم‌ها")
+
+    def ready(self):
+        from . import signals  # noqa: F401
