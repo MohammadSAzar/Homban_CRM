@@ -1,6 +1,6 @@
 # Homban Current Implementation State
 
-This document describes the baseline and customer JWT authentication foundation on 2026-09-15.
+This document describes the workspace-scoped customer authentication implementation on 2026-09-17.
 
 ## Repository
 Root folder:
@@ -95,6 +95,11 @@ Roles:
 
 Company-level/support users may eventually exist without customer workspace membership.
 
+Customer usernames now have database uniqueness on `(workspace, username)`, not
+globally. Django's `USERNAME_FIELD` is `id` (UUID); customer login still uses username
+plus password within resolved workspace context. Workspace-less names may repeat,
+but customer access is denied. Internal staff authenticate by UUID only. See ADR 0003.
+
 ### Legacy owner role review
 Accounts migration 0002 adds `is_workspace_owner` and removes the legacy `owner`
 role choice without converting data. The development database was checked on
@@ -147,7 +152,8 @@ assignment hook. Broader workspace immutability and bulk-write policies remain u
 ## Tests
 All four apps use `tests/` packages with correctly named `__init__.py` files.
 `pytest.ini` collects `test_*.py`; there are no conflicting app-level `tests.py` files.
-The default suite contains 44 test cases, including parameterized cases.
+The suite includes the original authentication/baseline cases, updated for explicit
+workspace context, plus workspace identity and resolver coverage.
 
 Tests already cover at least:
 - Workspace creation
@@ -164,10 +170,14 @@ allowlisting, anonymous denial, current database role/workspace state, inactive 
 and workspaces, removed membership/deleted users, refresh rotation/reuse rejection,
 invalid/expired/wrong-type tokens, missing/invalid identity claims, and required fields.
 The existing suite does not comprehensively cover all model rules or future role policies.
+New coverage checks cross-workspace namesakes, database duplicate rejection and
+membership moves, wrong-workspace credentials, workspace-less UUID identity,
+createsuperuser/admin compatibility, development header selection, configured hosts,
+unknown/inactive workspaces, disabled fallback, conflicting selectors, and untrusted hosts.
 
 ## API and deployment status
 Customer authentication endpoints:
-- `POST /api/v1/auth/login/`: username/password -> access and refresh tokens
+- `POST /api/v1/auth/login/`: resolved workspace + username/password -> access and refresh tokens
 - `POST /api/v1/auth/refresh/`: refresh token -> access and rotated refresh tokens
 - `GET /api/v1/auth/me/`: current-user profile only
 
@@ -183,11 +193,19 @@ role_display (Persian), is_workspace_owner, workspace_id, and workspace_name.
 Access lifetime is five minutes; refresh lifetime is one day, renewed on rotation.
 SimpleJWT's blacklist app rejects previously rotated refresh tokens. Its bundled
 migrations must be applied using `python manage.py migrate` in each environment;
-there are no new Homban model migrations. Schedule `python manage.py flushexpiredtokens`
+accounts migration `0003_workspace_scoped_username` adds scoped username uniqueness
+without deleting data. Schedule `python manage.py flushexpiredtokens`
 for production housekeeping. Clients should serialize refresh requests; rotation is
 not an absolute session-duration limit or a concurrent replay-prevention system.
 
-Django's `/admin/` still uses its existing session authentication. Business record
+Django's `/admin/` uses session authentication with UUID/password login for active
+workspace-less staff (enter the UUID as 32 hex characters). Customer login resolves
+workspace via `CUSTOMER_WORKSPACE_HOSTS`, or `X-Workspace-Slug` when the map is empty
+and `CUSTOMER_ALLOW_WORKSPACE_HEADER` is explicitly enabled (development only).
+Missing context fails closed; body workspace IDs are ignored. Refresh and `/me/`
+continue to use UUID and current database membership without a workspace selector.
+See [ADR 0003](decisions/0003-workspace-scoped-username.md) for migration and compatibility details.
+Business record
 APIs, role/object policies, and the customer frontend remain future work. Production
 deployment is incomplete (`ALLOWED_HOSTS` is empty). HTTPS, client token storage,
 login rate limiting, and signing-key operations need deployment decisions. This

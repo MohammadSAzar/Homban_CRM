@@ -73,6 +73,17 @@ Typical query flow:
 5. Apply field-level serialization restrictions
 
 ## Company control plane
+Customer credential lookup is scoped by workspace. A reusable resolver in
+`apps/accounts/workspace_context.py` uses an exact configured host-to-slug map,
+with an explicit development-only `X-Workspace-Slug` fallback. Missing or conflicting
+context fails closed. No body-supplied workspace ID selects the tenant.
+
+The database enforces `(workspace, username)` uniqueness. UUID remains the Django
+internal/JWT identity; authorization uses current database state. Workspace-less
+staff use UUID-based internal authentication and never enter customer auth.
+See [ADR 0003](decisions/0003-workspace-scoped-username.md) for configuration,
+nullable-uniqueness semantics, admin compatibility, and future host-routing limits.
+
 A future company-level control plane may manage:
 - Customer provisioning
 - Subscription/service status

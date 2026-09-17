@@ -6,6 +6,17 @@ from django.utils.translation import gettext_lazy as _
 
 
 class User(AbstractUser):
+    # Django/internal authentication needs an unambiguous identifier.
+    USERNAME_FIELD = "id"
+    REQUIRED_FIELDS = ["username", "email"]
+
+    username = models.CharField(
+        max_length=150,
+        validators=[AbstractUser.username_validator],
+        verbose_name=_("نام کاربری"),
+        help_text=_("نام کاربری باید در مجموعه یکتا باشد."),
+    )
+
     class Role(models.TextChoices):
         AGENCY_MANAGER = "agency_manager", _("مدیر املاک")
         RANGE_MANAGER = "range_manager", _("مدیر رنج")
@@ -58,6 +69,12 @@ class User(AbstractUser):
     )
 
     class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["workspace", "username"],
+                name="unique_username_per_workspace",
+            ),
+        ]
         verbose_name = _("کاربر")
         verbose_name_plural = _("کاربران")
 

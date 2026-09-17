@@ -14,6 +14,14 @@ Authorization is evaluated in this order:
 
 Never expose restricted data and merely hide it in the frontend.
 
+Customer login must first resolve an active workspace, then validate credentials
+only within it. Never fall back to a global username search. Development may select
+the workspace by `X-Workspace-Slug`; deployed host configuration takes precedence.
+This selector is not authorization. Inactive users/workspaces and workspace-less
+users are rejected. Staff/superuser flags do not bypass customer membership checks.
+JWT and `/me/` use UUID identity and current database membership; roles are not
+trusted from claims. See [ADR 0003](decisions/0003-workspace-scoped-username.md).
+
 ## Agency manager
 Scope:
 - Entire workspace

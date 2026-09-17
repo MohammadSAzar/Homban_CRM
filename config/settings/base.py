@@ -119,6 +119,11 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 #AUTH
 AUTH_USER_MODEL = "accounts.User"
+AUTHENTICATION_BACKENDS = ["apps.accounts.backends.WorkspaceIdentityBackend"]
+
+# Deployment supplies trusted, exact host -> existing workspace slug mappings.
+CUSTOMER_WORKSPACE_HOSTS = {}
+CUSTOMER_ALLOW_WORKSPACE_HEADER = False
 
 #DRF
 REST_FRAMEWORK = {

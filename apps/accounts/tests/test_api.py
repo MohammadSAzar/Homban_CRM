@@ -13,8 +13,9 @@ pytestmark = pytest.mark.django_db
 
 
 @pytest.fixture
-def client():
-    return APIClient()
+def client(settings):
+    settings.CUSTOMER_ALLOW_WORKSPACE_HEADER = True
+    return APIClient(HTTP_X_WORKSPACE_SLUG="auth-test")
 
 
 @pytest.fixture

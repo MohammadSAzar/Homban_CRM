@@ -11,6 +11,11 @@ A workspace may represent:
 The business-facing experience adapts to the buyer type, but the core platform remains shared.
 
 ## User roles
+Customer usernames are unique within their Workspace. The same username may exist
+in other workspaces; the globally unique identity is `User.id` (UUID).
+Workspace-less internal users retain nullable membership and may share display
+usernames, but cannot authenticate as customers. Their internal identity is UUID.
+
 Current roles:
 - `agency_manager` — مدیر املاک
 - `range_manager` — مدیر رنج
