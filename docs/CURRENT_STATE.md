@@ -1,6 +1,6 @@
 # Homban Current Implementation State
 
-This document describes the workspace-scoped customer authentication implementation on 2026-09-17.
+This document describes workspace-scoped authentication and organizational user management on 2026-09-17.
 
 ## Repository
 Root folder:
@@ -176,6 +176,35 @@ createsuperuser/admin compatibility, development header selection, configured ho
 unknown/inactive workspaces, disabled fallback, conflicting selectors, and untrusted hosts.
 
 ## API and deployment status
+Organizational user management endpoints:
+- `GET /api/v1/users/`: scoped list, ordered by username/UUID, 50 users per page
+- `POST /api/v1/users/`: create user, with optional agency-selected `range_id`
+- `GET /api/v1/users/<uuid>/`: scoped user detail
+- `PATCH /api/v1/users/<uuid>/`: allowed profile fields, status, and consultant range assignment
+
+`PATCH {"is_active": false}` deactivates and `true` reactivates eligible targets.
+PUT and DELETE are not exposed. Role/username/workspace/ownership are immutable.
+Agency managers see their workspace; range managers see themselves and consultants
+in exactly one active managed range. Consultant, secretary, and admin roles are denied.
+Self, agency-manager, and workspace-owner targets are read-only. Range-manager
+creation assigns consultants automatically; agency managers may assign/clear consultant
+membership and optionally assign a new range manager to an unoccupied active range.
+Sensitive lifecycle operations remain a future explicit administrative workflow.
+
+Policies live in `apps/accounts/policies.py`; multi-model mutations are transactional
+functions in `services.py`. Dedicated input serializers reject unknown fields;
+output serializers allowlist profile and scoped range data. Password validation uses
+Django's configured validators; password storage uses `set_password()`. No model or
+migration changes were required; existing workspace uniqueness and RangeMembership
+constraints remain in use.
+
+Read queries use select_related for consultant membership and prefetch_related for
+managed ranges. Query regression tests enforce fixed JWT-authenticated list counts
+(4 for agency managers, 5 for range managers) and detail counts (3 and 4 respectively).
+Tests cover role/target restrictions, cross-workspace ID guessing, range consistency,
+protected payload fields, password handling, transactional rollback, pagination,
+deactivation/reactivation, and created-user login alongside existing auth regressions.
+
 Customer authentication endpoints:
 - `POST /api/v1/auth/login/`: resolved workspace + username/password -> access and refresh tokens
 - `POST /api/v1/auth/refresh/`: refresh token -> access and rotated refresh tokens
@@ -214,7 +243,6 @@ foundation uses Django's environment-backed secret as SimpleJWT's default signin
 ## Not yet implemented / not confirmed as implemented
 Treat these as future work unless repository inspection proves otherwise:
 - Full permission framework
-- User-management API
 - File model/API
 - Customer model/API
 - Matching engine

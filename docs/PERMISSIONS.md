@@ -87,6 +87,45 @@ It is not itself a job role.
 
 Ownership may affect workspace-level settings and account administration but should not replace role/scope permissions.
 
+## Organizational user API policy
+This feature's explicit policy takes precedence over broad future capabilities:
+
+| Actor | Visible users | Creation | Updates and activation |
+| --- | --- | --- | --- |
+| Agency manager | Entire own workspace | Range manager, consultant, secretary, admin | Same-workspace users except protected targets |
+| Range manager | Self and consultants in exactly one active own range | Consultant automatically assigned to that range | Only those consultants, except workspace owners; no range selection |
+| Consultant, secretary, admin | None through management endpoints | Denied | Denied |
+
+Protected targets are the acting user, all agency managers, and workspace owners.
+They may be viewed within the actor's scope but not edited/deactivated through this
+API. Ownership and Django staff/superuser status never grant management permissions.
+Self-service `/auth/me/` retains its existing read-only behavior.
+
+Workspace is always derived from the authenticated user. Body fields cannot override
+it; workspace headers/query parameters cannot change management scope. Foreign and
+missing user UUIDs return the same 404 response for permitted actors. Range IDs are
+resolved only in the actor's workspace; foreign/unknown/inactive ranges share a
+generic validation error. An invalid/ambiguous range-manager scope allows only self
+visibility and prevents consultant management.
+
+Updates allow first_name, last_name, phone_number, is_active, and consultant range
+assignment by agency managers. Username, role, workspace, is_workspace_owner,
+password, Django flags, groups, and permissions are rejected on update rather than
+silently ignored. Creation uses an explicit field allowlist; extra fields are rejected.
+No hard delete or password-reset endpoint is included. Protected lifecycle operations
+are deferred to an explicitly designed administrative workflow.
+
+User/password/range writes are transactional services that recheck current actor
+state and scope. Workspace-row locking serializes these management writes within a
+workspace; row locks protect the actor, target, and selected range/membership where
+needed. This is not a universal guarantee for arbitrary direct ORM writes elsewhere.
+
+Responses include only id, username, first_name, last_name, phone_number, role,
+Persian role_display, is_active, is_workspace_owner, consultant range (id/name or
+null), and managed_ranges (id/name). No password/hash, email, Django permission
+internals, backend identity, or token data is returned. Related ranges are scoped
+to the same workspace even when reading inconsistent legacy relationships.
+
 ## Sensitive fields
 Examples:
 - Owner phone

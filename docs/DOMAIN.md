@@ -39,6 +39,40 @@ A range:
 
 Consultants can exist without a range.
 
+### Organizational user management
+The customer API supports user creation, scoped list/detail, profile updates, and
+activation/deactivation. It does not hard-delete users or create ranges implicitly.
+Role and username are immutable after creation through this API. Workspace,
+ownership, Django staff/superuser flags, groups, and permissions cannot be supplied
+or changed. Passwords are validated and hashed on creation; password resets are
+outside this feature.
+
+Agency managers may create range managers, consultants, secretaries, and workspace
+admins. Consultants may be unassigned or receive an active same-workspace range
+through `RangeMembership`. A newly created range manager may optionally take an
+active same-workspace range with no existing manager through `Range.manager`.
+An occupied range is rejected rather than silently replacing its manager.
+
+Range managers may create consultants only. Exactly one active, same-workspace
+managed range is required, and membership is assigned automatically. Any supplied
+`range_id` is rejected, including their own range or null. No/multiple valid active
+ranges fail with a Persian validation error. Inactive ranges are not candidates.
+
+Only agency managers can update a consultant's range assignment, including clearing
+membership with `range_id: null`. Updating a range manager's managed-range assignment
+is outside this feature. Secretary/admin users do not receive consultant membership.
+
+Deactivation only sets `User.is_active=False`. It preserves UUID, username, ownership,
+range membership, managed ranges, and other users' state. Reactivation is explicit.
+It does not cascade deactivation to a manager's consultants. Existing authentication
+checks deny inactive users on login, access, and refresh. Deactivation does not
+blacklist tokens: a still-unexpired token may work again after reactivation.
+
+Agency managers (including self) and workspace owners are read-only targets in this
+API. Range managers can view themselves but only manage in-scope consultants.
+Sensitive agency-manager/owner lifecycle operations require a future explicit
+administrative workflow, as confirmed by the product owner for this feature.
+
 ## Location
 Conceptual hierarchy:
 - City
