@@ -126,6 +126,31 @@ null), and managed_ranges (id/name). No password/hash, email, Django permission
 internals, backend identity, or token data is returned. Related ranges are scoped
 to the same workspace even when reading inconsistent legacy relationships.
 
+## Location API policy
+
+All authenticated active customer users with an active workspace may read location
+settings and available cities/regions in their workspace. Management requires
+`role == agency_manager OR is_workspace_owner`. The owner exception applies to all
+operational roles, including consultant/range manager/secretary/admin. Non-owner
+range managers, consultants, secretaries, and admins have read access only.
+Django staff/superuser flags do not grant location management capabilities.
+
+Location managers may read inactive records. Read-only users see active cities and
+active regions with active cities only, including on detail endpoints. Filters can
+narrow this scope but cannot broaden it. Deactivation never deletes or cascades
+changes to child records. The stored region active flag is independent of city state.
+
+Workspace comes only from the authenticated user's current database membership.
+Foreign object UUIDs and missing UUIDs return the same 404. Foreign/missing city
+assignments share a generic validation error. Write serializers and services reject
+workspace, source, external identifiers, and other fields outside their allowlist.
+External-source records cannot be edited or deactivated through ordinary APIs.
+
+Mutation services recheck current actor permission inside a transaction, locking
+workspace before actor and affected records. This follows the existing management
+write pattern; arbitrary ORM writes outside these services are not covered by it.
+Mode changes are non-destructive and never invoke external synchronization.
+
 ## Sensitive fields
 Examples:
 - Owner phone

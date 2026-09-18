@@ -87,6 +87,37 @@ External-source identity may be stored separately from internal identity.
 
 Do not assume external region labels exactly match internal Homban regions.
 
+### Location configuration API
+All active customer members may read their workspace's location configuration.
+Agency managers and workspace owners (regardless of operational role) may manage
+it. Ownership grants location configuration access only; it does not expand the
+organizational user-management policy.
+
+City names are unique per workspace; Region names are unique per workspace/city.
+The API derives workspace from authentication and validates Region.city against
+that workspace. Manual records can be created, renamed, activated/deactivated;
+manual Regions may be assigned to another city in the same workspace. Hard deletion
+is not exposed. Existing model constraints are retained without migrations.
+
+Location managers can read both active and inactive records for configuration and
+reactivation. Other customer users can read only active cities and active regions
+whose city is active. City deactivation preserves Region records and their active
+flags; reactivation restores visibility for regions that remain active. Managers
+may configure regions under inactive same-workspace cities; they remain hidden from
+read-only users until the city is active. Region-mode selection does not alter this
+visibility policy.
+
+Ordinary creation always uses `source=manual`. Source and external ID/slug fields
+cannot be supplied or changed. External-source records (currently Divar) are
+read-only through this API, including their active state, and belong to a future
+integration service's synchronization lifecycle.
+
+Changing `region_mode` between `none`, `custom`, and `divar` changes configuration
+only. It never deletes, rewrites, or synchronizes Cities/Regions. Manual configuration
+remains available in every mode. `none` does not hide configured data by itself;
+later File/Customer workflows may make Region optional. Divar synchronization and
+network integration remain future work.
+
 ## Records
 ### File
 Future core entity.

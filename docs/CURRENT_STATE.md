@@ -1,6 +1,7 @@
 # Homban Current Implementation State
 
-This document describes workspace-scoped authentication and organizational user management on 2026-09-17.
+This document describes workspace-scoped authentication, organizational user management,
+and location configuration APIs on 2026-09-17.
 
 ## Repository
 Root folder:
@@ -176,6 +177,43 @@ createsuperuser/admin compatibility, development header selection, configured ho
 unknown/inactive workspaces, disabled fallback, conflicting selectors, and untrusted hosts.
 
 ## API and deployment status
+Location configuration endpoints:
+- `GET/POST /api/v1/cities/`
+- `GET/PATCH /api/v1/cities/<uuid>/`
+- `GET/POST /api/v1/regions/`
+- `GET/PATCH /api/v1/regions/<uuid>/`
+- `GET/PATCH /api/v1/location-settings/` (`region_mode` and Persian display)
+
+City input is name and optional is_active. Region input additionally requires city
+(UUID) on creation, and permits same-workspace city changes on PATCH. PATCH is
+partial; PUT and DELETE are unavailable. Workspace, source, external ID/slug, and
+unknown write fields are rejected. External identifiers are omitted from output.
+Creation always uses manual source; external-source records are read-only.
+
+All active customer members can read. Agency managers OR workspace owners can
+manage, regardless of owner operational role. Managers see active/inactive records;
+other users see active cities and active regions under active cities. Lists accept
+`is_active=true/false`; regions also accept `city=<uuid>`. Filters never broaden the
+actor's scope. Managers can configure inactive cities/regions for later activation.
+Pagination uses 50 records with stable name/UUID ordering. Region queries join city
+with select_related; query regression tests enforce 3 queries per nonempty list,
+including JWT authentication and pagination count, independent of result size.
+
+Location policies, read/write/filter serializers, and transactional mutation services
+live in apps/locations. Services recheck current management eligibility while locking
+the workspace, actor, and affected rows. Existing model uniqueness and workspace
+validation are retained. No schema migrations or dependencies were added.
+
+Mode changes preserve all data in none/custom/divar modes and trigger no network
+requests or synchronization. City deactivation does not rewrite Region active flags.
+Divar synchronization remains future work owned by a separate integration service.
+Location tests cover role/owner access, non-destructive mode changes, source protection,
+payload allowlists, workspace isolation, uniqueness, city reassignment, deactivation,
+visibility, filtering, pagination, query counts, and current authentication state.
+There are 91 Location API cases alongside the 185 existing tests (276 total).
+The apps/common coverage run reports 98% overall statement coverage, including
+test and migration modules in that measurement.
+
 Organizational user management endpoints:
 - `GET /api/v1/users/`: scoped list, ordered by username/UUID, 50 users per page
 - `POST /api/v1/users/`: create user, with optional agency-selected `range_id`
