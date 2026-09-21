@@ -176,12 +176,76 @@ network integration remain future work.
 
 ## Records
 ### File
-Future core entity.
-Type:
-- sale
-- rent
+`apps.properties.PropertyFile` is the core stored CRM record (no API yet).
+It has a UUID, immutable workspace, required same-workspace consultant assignee,
+server-generated code, transaction type (`sale`/`rent`), status, and timezone-aware
+created/updated timestamps. Range membership is not required.
 
-Assigned to one consultant.
+City is required; Region is optional in all three region modes (`none`, `custom`,
+`divar`). Both must belong to the file's workspace, and Region.city must equal the
+file's City. Inactive related records may remain linked for historical continuity.
+A Region with linked files cannot move to a City inconsistent with those files.
+Address and description are explicit text fields. Owner name, owner phone, and
+visit-contact phone are separate fields; contact data is sensitive and must receive
+field-level authorization in future APIs.
+
+Structured characteristics are area (decimal square metres), bedrooms, total_floors,
+units_per_floor, unit_floor, building_age, parking, storage, elevator, and balcony.
+Unknown numbers are NULL; zero is accepted, including ground floor and new buildings.
+Negative numbers are rejected (basement numbering is not introduced in this stage).
+Facilities are nullable booleans: NULL means unknown, False explicitly absent.
+No floor-count interpretation or additional upper business bounds are inferred.
+
+All four monetary fields use Decimal values in **Iranian تومان**, with two decimal
+places, never floats or rials. Sale files may store price_per_square_meter and
+total_price; deposit_amount and monthly_rent must be NULL. Rent files use deposit_amount
+and monthly_rent; both sale amounts must be NULL. Unknown applicable amounts are NULL;
+zero is a real amount. No price derivation or deposit/rent conversion occurs.
+
+Source is an extensible technical choice field, currently `manual` only. Future
+choices may include Divar, Amlak Plus, Kashano, Peyvand, colleague, previous contact,
+or office sources; no integrations, discovery or import framework exists yet.
+
+`is_valuable` is independent of zero or more `PropertyFileValuableReason` children.
+Each child stores one reason label, unique per file. There is no comma-separated
+list, shared cross-workspace catalogue, seeded reason taxonomy, or inferred flag
+change when reasons are edited.
+
+`PropertyFileImage` stores UUID, parent, one opaque reference (URL/path/storage key),
+nonnegative sort_order and created_at. Ordering uses sort_order, then created_at/UUID
+for ties. No fetching, URL rendering, file uploads or storage infrastructure is added.
+A future storage relation can extend this child model without changing PropertyFile.
+
+The display/search code is `PF-` plus the complete uppercase UUID hex (35 characters).
+It is derived server-side, stable, non-sequential and globally UNIQUE in the database.
+No row counts, shortened random codes or read-then-increment races are used. A UUID/code
+collision fails safely on uniqueness rather than overwriting a record during creation.
+Codes are identifiers, never authorization credentials.
+
+Statuses are active (default), inactive, sold, rented and archived. This foundation
+stores status without introducing a deal workflow or automatic transitions. Ordinary
+workflows should change status, not delete records. Workspace, assignee, City and
+Region use PROTECT: deleting them cannot cascade away property history. This also
+intentionally blocks Workspace deletion when files exist. Image/reason children use
+CASCADE only if a file is deliberately deleted through privileged maintenance ORM;
+no hard-delete service or customer workflow is provided.
+
+Model saves call full_clean for workspace/assignee/location and field validation.
+Database CHECKs enforce nonnegative numbers, sale/rent field separation, valid status,
+and nonempty code. The code and per-file reason uniqueness also have database guards.
+The atomic creation service saves a file and its children together, using the existing
+Workspace lock order. It is an internal domain operation, not an authorization API.
+Bulk updates/raw SQL bypass cross-table model validation and are unsupported for
+relationship mutation. Existing User/City workspace changes must not be made through
+unvalidated maintenance writes; cross-table invariants are not SQL CHECK constraints.
+
+Indexes cover workspace + status, transaction_type, region and assigned_to for normal
+CRM scoping/filtering, in addition to FK and unique-code indexes. Area, bedrooms,
+total_price and building_age are future Matching/filter candidates; additional indexes
+await actual query plans rather than speculative independent numeric indexes.
+Location, transaction, characteristics and prices may inform future Matching. Address,
+description, owner/visit contact data, sources, images and valuable reasons remain
+first-class CRM data regardless of future Matching use. Customer and Matching are absent.
 
 ### Customer
 Future core entity.

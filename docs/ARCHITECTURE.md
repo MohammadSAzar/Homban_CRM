@@ -27,7 +27,8 @@ HombanCRM/
 │   ├── accounts/
 │   ├── organizations/
 │   ├── locations/
-│   └── ranges/
+│   ├── ranges/
+│   └── properties/
 ├── common/
 ├── config/
 │   └── settings/
@@ -38,7 +39,6 @@ HombanCRM/
 ```
 
 Future apps may include:
-- properties/files
 - customers
 - matching
 - tasks
@@ -49,6 +49,12 @@ Future apps may include:
 - audit/logging
 
 Do not create apps only because they are listed here. Create them when the domain boundary is ready.
+
+`properties` contains the PropertyFile domain models and atomic aggregate-creation
+service, without REST endpoints. File-owned image references and valuable-reason
+rows have no duplicated workspace field: their parent is the isolation boundary.
+Business references use PROTECT to retain file history. See DOMAIN for fields,
+validation limits, monetary units and the UUID-derived display code.
 
 ## Settings
 Settings are split into:

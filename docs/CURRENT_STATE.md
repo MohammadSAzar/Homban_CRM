@@ -1,7 +1,8 @@
 # Homban Current Implementation State
 
 This document describes workspace-scoped authentication, organizational user management,
-location configuration, and Range Management APIs on 2026-09-18.
+location configuration, Range Management APIs, and the PropertyFile domain foundation
+on 2026-09-21.
 
 ## Repository
 Root folder:
@@ -58,6 +59,7 @@ Known apps:
 - `accounts`
 - `locations`
 - `ranges`
+- `properties`
 
 ## Workspace
 A `Workspace` model exists.
@@ -150,8 +152,32 @@ to the automatic through table (including bulk writes/raw SQL) bypass it and are
 unsupported. Changing an already-linked object's workspace is not protected by this
 assignment hook. Broader workspace immutability and bulk-write policies remain unresolved.
 
+## PropertyFile domain foundation
+`properties` adds PropertyFile, PropertyFileImage and PropertyFileValuableReason.
+Files include assignment, optional Region/required City, address, separate owner/visit
+contacts, description, structured characteristics and nullable facilities, sale/rent
+Decimal prices in تومان, status, source, valuable flag, code and aware timestamps.
+Images are ordered opaque references; each valuable reason has its own child row.
+The full UUID-derived code is stable and database-unique. Model validation and database
+checks protect the numeric and transaction invariants; relationship validation rejects
+foreign-workspace assignments and City/Region mismatches. Referenced Regions cannot
+change City inconsistently. Workspace/User/City/Region deletion is protected when files
+reference them. No ordinary hard-delete operation is added.
+
+An atomic internal service creates files and children together. New migration
+`properties/0001_initial.py` creates only the new models, indexes and constraints;
+old migrations are unchanged. No Customer, Matching, APIs, frontend, media storage,
+imports or crawlers are implemented. See DOMAIN for defaults and integrity boundaries.
+
 ## Tests
-All four apps use `tests/` packages with correctly named `__init__.py` files.
+All five apps use `tests/` packages with correctly named `__init__.py` files.
+PropertyFile verification: 468 tests pass (395 existing plus 73 new), with 99%
+apps/common statement coverage, including test/migration modules; properties models
+and services have 100% statement coverage. Django check passes and the migration
+dry-run reports no drift. New tests cover sale/rent storage, tenant/location and
+assignee validation, numeric SQL constraints, nullable facilities, contacts/notes,
+status preservation, code stability/uniqueness, child ordering/uniqueness, atomic
+creation rollback, protected deletion and referenced-Region City changes.
 `pytest.ini` collects `test_*.py`; there are no conflicting app-level `tests.py` files.
 The suite includes the original authentication/baseline cases, updated for explicit
 workspace context, plus workspace identity and resolver coverage.
@@ -318,7 +344,7 @@ foundation uses Django's environment-backed secret as SimpleJWT's default signin
 ## Not yet implemented / not confirmed as implemented
 Treat these as future work unless repository inspection proves otherwise:
 - Full permission framework
-- File model/API
+- PropertyFile API (domain models now implemented)
 - Customer model/API
 - Matching engine
 - Pass/collaboration workflow

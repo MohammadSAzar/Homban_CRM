@@ -174,6 +174,9 @@ class Region(models.Model):
     def clean(self):
         super().clean()
 
+        if self.pk and self.property_files.exclude(city_id=self.city_id).exists():
+            raise ValidationError({"city": _("شهر منطقه با فایل‌های ملکی مرتبط سازگار نیست.")})
+
         if self.city_id and self.workspace_id:
             if self.city.workspace_id != self.workspace_id:
                 raise ValidationError(
