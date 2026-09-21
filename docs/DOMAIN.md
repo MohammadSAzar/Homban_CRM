@@ -58,9 +58,11 @@ managed range is required, and membership is assigned automatically. Any supplie
 `range_id` is rejected, including their own range or null. No/multiple valid active
 ranges fail with a Persian validation error. Inactive ranges are not candidates.
 
-Only agency managers can update a consultant's range assignment, including clearing
-membership with `range_id: null`. Updating a range manager's managed-range assignment
-is outside this feature. Secretary/admin users do not receive consultant membership.
+Through the User Management API, only agency managers can update a consultant's
+range assignment, including clearing membership with `range_id: null`. That API
+does not update a range manager's managed-range assignment. The Range Management
+API below provides explicit structural/membership operations. Secretary/admin users
+do not receive consultant membership.
 
 Deactivation only sets `User.is_active=False`. It preserves UUID, username, ownership,
 range membership, managed ranges, and other users' state. Reactivation is explicit.
@@ -72,6 +74,60 @@ Agency managers (including self) and workspace owners are read-only targets in t
 API. Range managers can view themselves but only manage in-scope consultants.
 Sensitive agency-manager/owner lifecycle operations require a future explicit
 administrative workflow, as confirmed by the product owner for this feature.
+
+### Range Management API
+Agency managers manage Range structure in their workspace: name, optional manager,
+activity_scope (`all`, `sale`, `rent`), Region constraints, and active status.
+Workspace owners of other operational roles may read the workspace structure but
+do not gain structural management powers. Range managers read Ranges assigned to
+them; consultants read only their own Range. Non-owner secretary/admin users have
+no access. Inactive assigned Ranges remain readable in the same scope.
+
+Managers are existing same-workspace users with role `range_manager`. Assignment,
+replacement, and removal are explicit; neither users nor Regions are created
+implicitly. Existing model behavior permits inactive managers to remain/be assigned
+without activating their account. Assignment does not modify the user's profile,
+role, ownership, or authentication state.
+
+Manager multiplicity remains unresolved: Range.manager is a nullable ForeignKey,
+so one user may manage multiple Ranges. This API preserves that schema and permits
+such assignments, with no uniqueness migration. Range managers can read their
+assigned Ranges, but membership writes retain User Management's requirement of
+exactly one active same-workspace managed Range; ambiguous states fail safely.
+Changing this cardinality requires a future explicit product decision.
+
+Agency managers add/remove consultants and explicitly move them between Ranges.
+Range managers may add an unassigned same-workspace consultant to their one active
+Range, or remove its consultants; they cannot take consultants from another Range.
+RangeMembership remains OneToOne per consultant. Membership writes protect workspace
+owners and self targets using the existing user-management target policy.
+Inactive consultants may retain/be assigned membership without account activation.
+New assignments require an active destination Range. Agency managers may remove
+memberships from inactive Ranges; range-manager writes require their active Range.
+
+Membership assignment uses PUT on the destination Range/consultant relationship.
+Moving an existing membership requires `from_range` equal to its current Range UUID;
+missing/stale source fails without changing membership. Repeating assignment to
+the same destination is idempotent. Range managers cannot supply `from_range`.
+DELETE on that relationship removes only membership, never the user or Range.
+
+Region constraints are replaced explicitly with a list; an empty list means
+unrestricted geography. New assignments require same-workspace active Regions
+under active same-workspace Cities. Existing inactive assignments may be retained
+or removed, but not newly added. External-source Regions can be linked without
+mutating their integration-owned data. No Region constraints means unrestricted
+geography; `activity_scope=all` is the default activity setting.
+
+Agency managers, owners, and assigned range managers see existing inactive Region
+constraints. Consultants see only active Region constraints under active Cities;
+`has_region_constraints` still reports true when constraints are hidden, so an
+empty visible list must not be interpreted as unrestricted geography.
+Roster reads are limited to agency managers, workspace owners, and the assigned
+range manager. User summaries contain only UUID, username, first_name, last_name.
+
+Range deactivation preserves manager, memberships, Regions, and user active flags.
+Reactivation is explicit; there is no hard-delete Range endpoint. Existing model
+constraints and the Range.regions M2M workspace guard remain unchanged.
 
 ## Location
 Conceptual hierarchy:

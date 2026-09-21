@@ -126,6 +126,49 @@ null), and managed_ranges (id/name). No password/hash, email, Django permission
 internals, backend identity, or token data is returned. Related ranges are scoped
 to the same workspace even when reading inconsistent legacy relationships.
 
+## Range API policy
+
+| Actor | Range reads | Structural writes | Membership writes |
+| --- | --- | --- | --- |
+| Agency manager | All own-workspace Ranges | Allowed | Add, explicit move, remove |
+| Non-agency workspace owner | All own-workspace Ranges | Denied | Operational role only |
+| Range manager | Assigned Ranges | Denied | Add unassigned consultants/remove own consultants, exactly one active managed Range |
+| Consultant | Own membership's Range | Denied | Denied |
+| Non-owner secretary/admin | Denied | Denied | Denied |
+
+Inactive Range reads use the same scope. Rosters are visible to agency managers,
+workspace owners, and the assigned range manager, not ordinary consultants.
+Roster/manager summaries expose only id, username, first_name, last_name; no phone,
+email, credentials, permission internals, or tokens. Nested manager, Region, roster,
+and count queries also enforce workspace consistency for legacy invalid relations.
+
+Only agency managers change name, manager, activity_scope, is_active, or regions.
+Ownership and Django staff/superuser flags never grant structural write access.
+Membership services retain protected-target checks: self and workspace-owner users
+cannot be reassigned/removed through ordinary membership operations. Consultant role
+and same-workspace membership are mandatory. Range-manager ownership grants broader
+read access only; membership writes remain restricted to their one active Range.
+
+The new relationship endpoints permit range managers to add unassigned consultants
+and remove own consultants; `/api/v1/users/` permissions are unchanged. Other-Range
+consultants and foreign/missing IDs are not revealed by membership writes. Agency
+manager moves require an explicit matching `from_range`; changes are transactional.
+Range.manager allows multiple Ranges per manager in the existing schema. That
+cardinality is preserved; ambiguous active Range states block range-manager writes.
+
+Existing inactive Region constraints are visible to agency managers, owners, and
+assigned range managers. Ordinary consultants receive only active Regions under
+active Cities plus `has_region_constraints`, which remains true for hidden constraints.
+New Region assignments reject inactive Regions/Cities. Existing assignments can be
+retained/removed. Range deactivation changes no memberships or child/user active flags.
+There is no Range hard delete; relationship DELETE only removes RangeMembership.
+
+All writes derive workspace from current authenticated membership. Strict payload
+allowlists reject workspace/user privilege overrides. Services use the existing
+workspace-then-actor locking order and recheck role, target scope, manager/member
+relationships, and Region validity. Direct bulk/SQL writes outside these services
+remain unsupported; no new database constraints or signals are introduced.
+
 ## Location API policy
 
 All authenticated active customer users with an active workspace may read location

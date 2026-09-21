@@ -1,7 +1,7 @@
 # Homban Current Implementation State
 
 This document describes workspace-scoped authentication, organizational user management,
-and location configuration APIs on 2026-09-17.
+location configuration, and Range Management APIs on 2026-09-18.
 
 ## Repository
 Root folder:
@@ -177,6 +177,43 @@ createsuperuser/admin compatibility, development header selection, configured ho
 unknown/inactive workspaces, disabled fallback, conflicting selectors, and untrusted hosts.
 
 ## API and deployment status
+Range Management endpoints:
+- `GET/POST /api/v1/ranges/`
+- `GET/PATCH /api/v1/ranges/<uuid>/`
+- `GET /api/v1/ranges/<uuid>/consultants/`
+- `PUT/DELETE /api/v1/ranges/<uuid>/consultants/<user_uuid>/`
+
+Only agency managers modify structural fields: name, manager (UUID/null),
+activity_scope, regions (UUID list), is_active. PATCH is partial; Range PUT/DELETE
+are unavailable. Ownership grants workspace-wide read access, not structural writes.
+Range managers read assigned Ranges; consultants read their membership's Range.
+Non-owner secretary/admin users have no Range API access. Inactive Range reads
+retain this scope. Rosters are separate paginated minimal user summaries for
+agency managers, owners, and assigned range managers.
+
+Membership PUT assigns an unassigned consultant, or moves an existing membership
+with explicit `from_range` matching the current Range UUID. Same-destination PUT is
+idempotent. Relationship DELETE removes membership only. Agency managers can move
+consultants; range managers can add unassigned/remove own consultants in exactly
+one active managed Range. Workspace-owner consultants remain protected targets.
+User Management and Location API behaviors are unchanged.
+
+Policies, serializers, transactional services, views, URLs, and API tests live in
+apps/ranges. Workspace locking follows the existing management-service order.
+Read queries join manager, prefetch Regions, and annotate consultant counts without
+fetching unbounded rosters. Lists/rosters paginate at 50, with stable name/UUID or
+username/UUID order. Query tests cover fixed Range list/detail/roster costs.
+
+No schema migrations or dependencies were needed. Range.manager remains nullable
+and non-unique: multiple Ranges per manager are permitted by existing schema, while
+ambiguous active ranges block range-manager membership writes. This unresolved
+cardinality is documented for future product review, without a uniqueness migration.
+New Region constraints require active Regions/Cities in the workspace; existing
+inactive constraints may be retained and are visible to management readers.
+Consultants see active constraints only, with has_region_constraints preserving
+the distinction between hidden constraints and unrestricted geography.
+Range deactivation preserves all relationships and user states; no hard delete exists.
+
 Location configuration endpoints:
 - `GET/POST /api/v1/cities/`
 - `GET/PATCH /api/v1/cities/<uuid>/`
@@ -210,9 +247,9 @@ Divar synchronization remains future work owned by a separate integration servic
 Location tests cover role/owner access, non-destructive mode changes, source protection,
 payload allowlists, workspace isolation, uniqueness, city reassignment, deactivation,
 visibility, filtering, pagination, query counts, and current authentication state.
-There are 91 Location API cases alongside the 185 existing tests (276 total).
-The apps/common coverage run reports 98% overall statement coverage, including
-test and migration modules in that measurement.
+The approved Location baseline contained 91 Location API cases and 185 earlier
+tests (276 total), with 98% apps/common statement coverage including test/migration
+modules. Range API verification extends that baseline.
 
 Organizational user management endpoints:
 - `GET /api/v1/users/`: scoped list, ordered by username/UUID, 50 users per page

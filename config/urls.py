@@ -22,6 +22,7 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/v1/auth/', include('apps.accounts.urls')),
     path('api/v1/', include('apps.locations.urls')),
+    path('api/v1/', include('apps.ranges.urls')),
     path('api/v1/users/', UserListCreateView.as_view(), name='user-list'),
     path('api/v1/users/<uuid:pk>/', UserDetailView.as_view(), name='user-detail'),
 ]
