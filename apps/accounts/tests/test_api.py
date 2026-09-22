@@ -2,6 +2,7 @@ from datetime import timedelta
 
 import pytest
 from django.urls import reverse
+from django.utils import timezone
 from rest_framework.test import APIClient
 from rest_framework_simplejwt.tokens import AccessToken, RefreshToken
 from rest_framework_simplejwt.token_blacklist.models import OutstandingToken
@@ -36,7 +37,10 @@ def login(client, customer):
     }, format="json")
 
 
-def test_login_returns_identity_tokens(client, customer):
+def test_login_returns_identity_tokens(client, customer, monkeypatch):
+    # Refresh/access creation must share a clock for exact lifetime assertions.
+    issued_at = timezone.now()
+    monkeypatch.setattr("rest_framework_simplejwt.tokens.aware_utcnow", lambda: issued_at)
     response = login(client, customer)
     assert response.status_code == 200
     assert set(response.data) == {"access", "refresh"}

@@ -176,7 +176,7 @@ network integration remain future work.
 
 ## Records
 ### File
-`apps.properties.PropertyFile` is the core stored CRM record (no API yet).
+`apps.properties.PropertyFile` is the core stored CRM record, with an operational REST API.
 It has a UUID, immutable workspace, required same-workspace consultant assignee,
 server-generated code, transaction type (`sale`/`rent`), status, and timezone-aware
 created/updated timestamps. Range membership is not required.
@@ -248,6 +248,30 @@ await actual query plans rather than speculative independent numeric indexes.
 Location, transaction, characteristics and prices may inform future Matching. Address,
 description, owner/visit contact data, sources, images and valuable reasons remain
 first-class CRM data regardless of future Matching use. Matching remains future work.
+
+#### PropertyFile operational API
+`/api/v1/property-files/` supports paginated GET and POST; `/<uuid>/` supports GET and
+PATCH only. Actor scope is documented in PERMISSIONS; this API does not expose files
+outside management/assignment scope for Matching. PATCH supports profile/property data,
+sale/rent values and existing statuses, with no Deal-driven transitions. Workspace,
+UUID/code, timestamps and source cannot be written. Applicable fields may be cleared
+with null when switching sale/rent type. Existing domain rules remain authoritative;
+inactive same-workspace City/Region references remain permitted for historical use.
+
+`valuable_reasons` is an optional array of individual labels on create/PATCH. Supplying
+it replaces the entire set atomically; [] clears it. Omission preserves existing reasons.
+The is_valuable flag remains independent. Detail returns reasons and ordered images.
+POST `/<uuid>/images/` with reference appends an opaque reference. PATCH that endpoint
+with `order: [image UUIDs]` requires every current image exactly once and assigns
+contiguous positions. DELETE `/<uuid>/images/<image_uuid>/` removes only that reference;
+it never deletes the file or external media. No uploads, fetching or storage are added.
+
+List filtering supports transaction_type, status, assigned_to, city, region, min_area,
+max_area, bedrooms, min_total_price, max_total_price, source and is_valuable. Monetary
+filters use تومان; price bounds naturally exclude rent rows whose total_price is NULL.
+Filters narrow authorized scope and do not implement Matching. Lists use 50-row pages
+with created_at/UUID ordering, join display relations, and omit child collections.
+Detail prefetches images/reasons and includes contact data only after scope checks.
 
 ### Customer
 `apps.customers.Customer` is a first-class CRM record, with no REST API yet.

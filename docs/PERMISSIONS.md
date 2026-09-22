@@ -195,6 +195,40 @@ write pattern; arbitrary ORM writes outside these services are not covered by it
 Mode changes are non-destructive and never invoke external synchronization.
 
 ## Sensitive fields
+### PropertyFile API policy
+
+The general PropertyFile API is not a workspace-wide Matching browsing surface.
+Agency managers read/manage all valid workspace files; consultants read/manage only
+their own assigned files. Range managers read/manage files assigned to consultants
+in the union of all ACTIVE Ranges they manage, with same-workspace membership checks.
+Zero active Ranges gives empty scope; multiple active Ranges are valid here. The
+exactly-one-active-Range guard for User Management automatic placement is unchanged.
+Inactive/sold/rented/archived files remain accessible within the same authorized scope.
+
+Secretary/admin roles have no access. Workspace ownership and Django staff/superuser
+flags do not expand operational permissions. Domain assignment remains consultant-only,
+so range-manager users cannot directly receive files. New assignment/reassignment
+requires an active consultant in the actor's authorized scope. Existing files of an
+inactive consultant remain manageable by an authorized manager without activating them.
+
+Consultant creation auto-assigns self. Agency/range managers explicitly provide
+assigned_to; consultants may supply only their own UUID. Agency managers may reassign
+within the Workspace; range managers within their active-Range union. Reassignment
+immediately changes visibility. Workspace is derived from current authentication,
+never body/query/header authority. Out-of-scope/missing files and child IDs return 404.
+
+Authorized detail responses include owner_name, owner_phone and visit_contact_phone.
+List responses omit contacts, address, notes, images and reasons. There is no restricted
+cross-owner detail/list response in this feature: out-of-scope readers receive no file.
+Future Matching will define its own restricted candidate representation. Consultant
+summaries expose only UUID, username, first_name and last_name.
+
+Strict write allowlists reject workspace, code, timestamps, source and privilege fields.
+Ordinary creation uses manual source. Transactional services lock Workspace before the
+current actor and parent file, recheck role/scope and validate assignment/location through
+the existing domain. Nested writes use the same parent scope; reason replacement and
+image operations are transactional. No file DELETE endpoint exists.
+
 Examples:
 - Owner phone
 - Customer phone

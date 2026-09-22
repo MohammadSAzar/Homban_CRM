@@ -1,8 +1,8 @@
 # Homban Current Implementation State
 
 This document describes workspace-scoped authentication, organizational user management,
-location configuration, Range Management APIs, and PropertyFile/Customer domain foundations
-on 2026-09-21.
+location configuration, Range Management and PropertyFile APIs, and PropertyFile/Customer
+domain foundations on 2026-09-22.
 
 ## Repository
 Root folder:
@@ -167,7 +167,7 @@ reference them. No ordinary hard-delete operation is added.
 
 An atomic internal service creates files and children together. New migration
 `properties/0001_initial.py` creates only the new models, indexes and constraints;
-old migrations are unchanged. No PropertyFile Matching, APIs, frontend, media storage,
+old migrations are unchanged. No PropertyFile Matching, frontend, media storage,
 imports or crawlers are implemented. See DOMAIN for defaults and integrity boundaries.
 
 ## Customer domain foundation
@@ -240,6 +240,39 @@ createsuperuser/admin compatibility, development header selection, configured ho
 unknown/inactive workspaces, disabled fallback, conflicting selectors, and untrusted hosts.
 
 ## API and deployment status
+PropertyFile endpoints:
+- `GET/POST /api/v1/property-files/`
+- `GET/PATCH /api/v1/property-files/<uuid>/`
+- `POST/PATCH /api/v1/property-files/<uuid>/images/` (append reference / reorder all)
+- `DELETE /api/v1/property-files/<uuid>/images/<image_uuid>/` (reference removal only)
+
+Agency managers manage workspace files; consultants their own files; range managers
+files of consultants in all their active managed Ranges. Zero active Ranges gives no
+scope; the User Management exactly-one-Range rule is unchanged. There is no general
+cross-owner browsing, even for owners. Secretary/admin users have no access. Future
+Matching will own restricted candidate output. Details contain contacts only within
+authorized scope; compact lists omit contacts and free-text operational data.
+
+Creation/reassignment uses active scoped consultants. Workspace/code/source/timestamps
+are server-owned. PATCH updates existing fields/status and atomically replaces reasons
+when supplied. Image references can be appended, removed or reordered with a complete
+UUID list; no file DELETE, uploads or media fetching exists. Domain validation and
+protected history remain unchanged. django-filter narrows workspace/scoped lists by
+type/status/assignee/location/area/bedrooms/sale price/source/valuable flag.
+
+Property policies, serializers, filters, views and transactional API services live in
+apps/properties, alongside the unchanged internal domain-creation service. Reads join
+display relations; list pages omit child collections and detail prefetches them.
+No schema changes, migrations or new dependencies are required. Customer API and
+Matching remain future work.
+
+PropertyFile API verification: 620 tests pass (533 existing plus 87 API cases),
+with 99% apps/common statement coverage. Django check passes and no migration drift
+exists. Query regression tests enforce 3 queries for lists and 4 for details across
+authorized roles as related records grow. The existing JWT lifetime test now fixes
+the token clock during issuance, preserving exact lifetime assertions without
+changing authentication behavior or settings.
+
 Range Management endpoints:
 - `GET/POST /api/v1/ranges/`
 - `GET/PATCH /api/v1/ranges/<uuid>/`
@@ -372,8 +405,7 @@ and `CUSTOMER_ALLOW_WORKSPACE_HEADER` is explicitly enabled (development only).
 Missing context fails closed; body workspace IDs are ignored. Refresh and `/me/`
 continue to use UUID and current database membership without a workspace selector.
 See [ADR 0003](decisions/0003-workspace-scoped-username.md) for migration and compatibility details.
-Business record
-APIs, role/object policies, and the customer frontend remain future work. Production
+Customer record APIs, future workflow policies, and the customer frontend remain future work. Production
 deployment is incomplete (`ALLOWED_HOSTS` is empty). HTTPS, client token storage,
 login rate limiting, and signing-key operations need deployment decisions. This
 foundation uses Django's environment-backed secret as SimpleJWT's default signing key.
@@ -381,7 +413,6 @@ foundation uses Django's environment-backed secret as SimpleJWT's default signin
 ## Not yet implemented / not confirmed as implemented
 Treat these as future work unless repository inspection proves otherwise:
 - Full permission framework
-- PropertyFile API (domain models now implemented)
 - Customer API (domain models now implemented)
 - Matching engine
 - Pass/collaboration workflow
