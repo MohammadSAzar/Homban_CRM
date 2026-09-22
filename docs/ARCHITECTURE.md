@@ -28,7 +28,8 @@ HombanCRM/
 │   ├── organizations/
 │   ├── locations/
 │   ├── ranges/
-│   └── properties/
+│   ├── properties/
+│   └── customers/
 ├── common/
 ├── config/
 │   └── settings/
@@ -39,7 +40,6 @@ HombanCRM/
 ```
 
 Future apps may include:
-- customers
 - matching
 - tasks
 - deals
@@ -55,6 +55,11 @@ service, without REST endpoints. File-owned image references and valuable-reason
 rows have no duplicated workspace field: their parent is the isolation boundary.
 Business references use PROTECT to retain file history. See DOMAIN for fields,
 validation limits, monetary units and the UUID-derived display code.
+
+`customers` holds Customer, customer-specific valuable reasons and an explicit Region
+preference through model. Model and M2M guards enforce cross-table integrity; internal
+transactional services follow the existing Workspace lock order. No Customer API or
+Matching implementation is included.
 
 ## Settings
 Settings are split into:

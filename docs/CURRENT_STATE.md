@@ -1,7 +1,7 @@
 # Homban Current Implementation State
 
 This document describes workspace-scoped authentication, organizational user management,
-location configuration, Range Management APIs, and the PropertyFile domain foundation
+location configuration, Range Management APIs, and PropertyFile/Customer domain foundations
 on 2026-09-21.
 
 ## Repository
@@ -60,6 +60,7 @@ Known apps:
 - `locations`
 - `ranges`
 - `properties`
+- `customers`
 
 ## Workspace
 A `Workspace` model exists.
@@ -166,11 +167,30 @@ reference them. No ordinary hard-delete operation is added.
 
 An atomic internal service creates files and children together. New migration
 `properties/0001_initial.py` creates only the new models, indexes and constraints;
-old migrations are unchanged. No Customer, Matching, APIs, frontend, media storage,
+old migrations are unchanged. No PropertyFile Matching, APIs, frontend, media storage,
 imports or crawlers are implemented. See DOMAIN for defaults and integrity boundaries.
 
+## Customer domain foundation
+Customer, CustomerRegionPreference and CustomerValuableReason are implemented in
+`apps/customers`, with initial migration `customers/0001_initial.py`.
+Buyer/tenant money remains separate in تومان. Buyer budget_status is nullable with
+the confirmed cash/cash_plus_property Persian choices; tenants cannot use it.
+Models include explicit name/mobile/notes, assignment, code/status, nullable area/age
+bounds and bedrooms, multiple Region preferences and customer-specific valuable reasons.
+SQL CHECKs protect numeric/bound/type invariants. Model and forward/reverse M2M guards
+protect workspace integrity and reject new inactive Region links. Existing inactive
+links may remain. Region references and business parents are protected from deletion.
+Atomic internal services create aggregates and replace preferences. No Customer REST
+API, frontend, Matching or Deal logic is included. PropertyFile remains unchanged.
+
 ## Tests
-All five apps use `tests/` packages with correctly named `__init__.py` files.
+All six apps use `tests/` packages with correctly named `__init__.py` files.
+Customer verification: 525 tests pass (468 existing plus 57 new), with 99% overall
+apps/common statement coverage and 100% for Customer models/services/guards.
+Django check passes; migration dry-run reports no drift. Tests cover buyer/tenant
+money and budget status, nullable bounds, SQL constraints, assignment, Region M2M
+guards in both directions, inactive retention, atomic rollback, reasons, codes,
+status preservation and protected deletion. The full regression ran once via coverage.
 PropertyFile verification: 468 tests pass (395 existing plus 73 new), with 99%
 apps/common statement coverage, including test/migration modules; properties models
 and services have 100% statement coverage. Django check passes and the migration
@@ -345,7 +365,7 @@ foundation uses Django's environment-backed secret as SimpleJWT's default signin
 Treat these as future work unless repository inspection proves otherwise:
 - Full permission framework
 - PropertyFile API (domain models now implemented)
-- Customer model/API
+- Customer API (domain models now implemented)
 - Matching engine
 - Pass/collaboration workflow
 - Task/calendar

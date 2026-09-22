@@ -245,15 +245,66 @@ total_price and building_age are future Matching/filter candidates; additional i
 await actual query plans rather than speculative independent numeric indexes.
 Location, transaction, characteristics and prices may inform future Matching. Address,
 description, owner/visit contact data, sources, images and valuable reasons remain
-first-class CRM data regardless of future Matching use. Customer and Matching are absent.
+first-class CRM data regardless of future Matching use. Matching remains future work.
 
 ### Customer
-Future core entity.
-Type:
-- buyer
-- tenant
+`apps.customers.Customer` is a first-class CRM record, with no REST API yet.
+Core fields are UUID, immutable workspace, required same-workspace consultant
+assigned_to, stable code, customer_type (`buyer`/`tenant`), status, name, mobile,
+description, is_valuable and timezone-aware created_at/updated_at. Name is required;
+unknown mobile and notes may be empty. Mobile is contact data, not a unique identity.
+Assignment does not require Range membership and remains explicit for future pass.
+No pass, Matching, Deal transitions or contact-visibility API is implemented here.
 
-Assigned to one consultant.
+Nullable requirements are min_area/max_area (decimal square metres),
+min_building_age/max_building_age (whole years) and bedrooms. NULL means no requirement;
+zero is valid. Negative values and lower bounds exceeding existing upper bounds are
+rejected by model validation and database CHECKs.
+
+Buyers have nullable budget and budget_status. The confirmed Google Sheets choices are
+`cash` — کاملاً نقد and `cash_plus_property` — بخشی نقد + آپارتمان.
+No choice is forced: default is NULL and empty strings normalize to NULL.
+Tenants have separate deposit_budget and monthly_rent_budget. Buyer tenant-only
+amounts must be NULL; tenant budget and budget_status must be NULL. All money uses
+Decimal (two decimal places), in Iranian **تومان**. No automatic conversion occurs.
+
+preferred_regions is a real M2M via CustomerRegionPreference, with a unique
+(customer, region) pair. Zero or multiple Regions are allowed, including Regions in
+different Cities in the same workspace; there is no duplicated City preference.
+Every Region (and its City) must belong to the customer's workspace. New links to
+inactive Regions are rejected. Existing inactive preferences can remain or be removed;
+removing then re-adding is a new assignment. City active state is not an additional
+preference rule in this foundation. All workspace region modes allow empty preferences.
+
+An m2m_changed guard protects forward/reverse add/set because Django's M2M manager
+bulk-creates links without calling the through model's save. Direct through-model
+saves also validate. The service uses Workspace-row locking and transactions for
+aggregate creation and replacing preferences, preserving old links on failure.
+These are internal domain services, not actor authorization. Bulk writes/raw SQL
+bypass application-level cross-table checks and are unsupported; direct mutation of
+related Workspace membership also remains outside these guarantees.
+
+CustomerValuableReason stores one label per child, unique within its Customer.
+Reasons are independent of PropertyFile vocabulary. is_valuable may be true with
+zero reasons; neither reasons nor flag are automatically inferred from the other.
+Statuses are active (default), inactive, completed and archived. They preserve
+relationships; no automatic completion or ordinary hard-delete workflow is added.
+Workspace and assignee use PROTECT. Region preferences use PROTECT for Region,
+also preventing cascading City deletion from silently losing selected preferences.
+Customer-owned reasons/preferences use CASCADE only for explicit maintenance deletion.
+
+Customer codes use `CU-` plus complete uppercase UUID hex, unique in the database and
+immutable through model saves. This follows PropertyFile's UUID convention without
+modifying PropertyFile (it has no existing shared generator to reuse). No row counts
+or shortened random values are used; collisions fail safely at uniqueness validation.
+Code is searchable/displayable and is never authorization.
+
+Indexes cover workspace + status, customer_type and assigned_to, plus normal FK and
+unique-code/pair indexes. Further budget/bedroom/area indexes await actual query plans.
+Regions, type, requirements and original financial values are future Matching inputs.
+Name, mobile, description, status, assignment and valuable reasons remain essential
+operational CRM data regardless of future Matching use. Canonical dates stay timezone
+aware; Jalali display is deferred to presentation.
 
 ## Assignment
 A consultant is the responsible owner of an assigned file/customer.
