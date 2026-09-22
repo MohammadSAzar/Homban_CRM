@@ -195,6 +195,35 @@ write pattern; arbitrary ORM writes outside these services are not covered by it
 Mode changes are non-destructive and never invoke external synchronization.
 
 ## Sensitive fields
+### Customer API policy
+
+Agency managers read/manage all valid Customers in their Workspace. Consultants
+read/manage only their own assigned Customers. Range managers read/manage Customers
+assigned to consultants in the union of all ACTIVE Ranges they manage. Zero active
+Ranges gives no scope. This does not change User Management's exactly-one-Range guard.
+Secretary/admin roles have no Customer API access; workspace ownership or Django
+staff/superuser flags do not expand operational scope.
+
+Consultants automatically assign new Customers to themselves and may only submit
+their own assignee UUID. Agency/range managers must explicitly select an active
+same-workspace consultant in their scope. Reassignment follows the same rule and
+immediately changes visibility. Authorized managers may still manage existing records
+of inactive consultants. All Customer statuses remain readable within actor scope.
+
+Workspace is derived from authenticated server context. Missing, foreign-workspace
+and out-of-scope Customer UUIDs return the same 404. There is no cross-owner browsing
+surface: name/mobile/description are never returned outside authorized scope. Lists
+include name, while mobile and notes are detail-only. Future Matching must use its
+own restricted representation. Assignee summaries contain only UUID, username,
+first_name and last_name; no phone, password or permission internals are exposed.
+
+Strict payload allowlists reject workspace/code/timestamps and privilege overrides.
+Services lock Workspace, current actor and Customer, recheck scope, and reuse domain
+validation and preference services. Preferred Regions must belong to the same
+Workspace (including their City); new inactive links are rejected, retained inactive
+links remain visible. Preferences and reasons are replaced transactionally with the
+parent update. No Customer hard-delete endpoint exists.
+
 ### PropertyFile API policy
 
 The general PropertyFile API is not a workspace-wide Matching browsing surface.

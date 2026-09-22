@@ -1,8 +1,8 @@
 # Homban Current Implementation State
 
 This document describes workspace-scoped authentication, organizational user management,
-location configuration, Range Management and PropertyFile APIs, and PropertyFile/Customer
-domain foundations on 2026-09-22.
+location configuration, Range Management, PropertyFile and Customer APIs, and PropertyFile/Customer
+domain foundations on 2026-09-23.
 
 ## Repository
 Root folder:
@@ -180,8 +180,9 @@ bounds and bedrooms, multiple Region preferences and customer-specific valuable 
 SQL CHECKs protect numeric/bound/type invariants. Model and forward/reverse M2M guards
 protect workspace integrity and reject new inactive Region links. Existing inactive
 links may remain. Region references and business parents are protected from deletion.
-Atomic internal services create aggregates and replace preferences. No Customer REST
-API, frontend, Matching or Deal logic is included. PropertyFile remains unchanged.
+Atomic internal services create aggregates and replace preferences. The Customer REST
+API now authorizes these operations; frontend, Matching and Deal logic remain future work.
+PropertyFile remains unchanged by the Customer API feature.
 
 ## Tests
 ### File/Customer integration audit
@@ -240,6 +241,34 @@ createsuperuser/admin compatibility, development header selection, configured ho
 unknown/inactive workspaces, disabled fallback, conflicting selectors, and untrusted hosts.
 
 ## API and deployment status
+Customer endpoints:
+- `GET/POST /api/v1/customers/`
+- `GET/PATCH /api/v1/customers/<uuid>/`
+
+Agency managers manage workspace Customers, consultants their own, and range managers
+Customers of consultants across all their active managed Ranges. No ownership/staff
+bypass or general cross-owner browsing exists. Future Matching visibility is separate.
+Creation/reassignment requires an active scoped consultant; workspace/code/timestamps
+remain server-owned. Contact data is scoped before serialization. Compact lists include
+name; mobile, description, preferred Regions and reasons appear in authorized details.
+PATCH replaces supplied Region/reason arrays transactionally; omission preserves them,
+`[]` clears them. Existing inactive Region links may remain, but new ones are rejected.
+No hard delete or schema change is introduced. Domain validation is reused.
+
+django-filter supports type/status/assignee/preferred Region, area requirement bounds,
+bedrooms, buyer budget, tenant deposit/monthly rent budgets, budget status and valuable
+flag. Pagination uses 50 records with stable creation/UUID ordering. Reads join assignee
+and workspace; only details prefetch scoped Regions and reasons. See DOMAIN and
+PERMISSIONS for exact filtering and access semantics.
+
+Customer API verification: 705 tests pass (620 existing plus 85 API cases), with 99%
+apps/common statement coverage. Django check passes; migration dry-run reports no
+changes. Query regression tests enforce 3 queries for lists and 4 for details across
+all authorized roles as related data grows. Tests cover scope/contact isolation,
+active-Range unions, assignment, filters, immutable fields, financial/bounds validation,
+inactive Region retention, aggregate rollback, reasons, auth state and pagination.
+No Customer schema, PropertyFile code or existing tests were changed.
+
 PropertyFile endpoints:
 - `GET/POST /api/v1/property-files/`
 - `GET/PATCH /api/v1/property-files/<uuid>/`
@@ -263,8 +292,7 @@ type/status/assignee/location/area/bedrooms/sale price/source/valuable flag.
 Property policies, serializers, filters, views and transactional API services live in
 apps/properties, alongside the unchanged internal domain-creation service. Reads join
 display relations; list pages omit child collections and detail prefetches them.
-No schema changes, migrations or new dependencies are required. Customer API and
-Matching remain future work.
+No schema changes, migrations or new dependencies are required. Matching remains future work.
 
 PropertyFile API verification: 620 tests pass (533 existing plus 87 API cases),
 with 99% apps/common statement coverage. Django check passes and no migration drift
@@ -405,7 +433,7 @@ and `CUSTOMER_ALLOW_WORKSPACE_HEADER` is explicitly enabled (development only).
 Missing context fails closed; body workspace IDs are ignored. Refresh and `/me/`
 continue to use UUID and current database membership without a workspace selector.
 See [ADR 0003](decisions/0003-workspace-scoped-username.md) for migration and compatibility details.
-Customer record APIs, future workflow policies, and the customer frontend remain future work. Production
+Future workflow policies and the customer frontend remain future work. Production
 deployment is incomplete (`ALLOWED_HOSTS` is empty). HTTPS, client token storage,
 login rate limiting, and signing-key operations need deployment decisions. This
 foundation uses Django's environment-backed secret as SimpleJWT's default signing key.
@@ -413,7 +441,6 @@ foundation uses Django's environment-backed secret as SimpleJWT's default signin
 ## Not yet implemented / not confirmed as implemented
 Treat these as future work unless repository inspection proves otherwise:
 - Full permission framework
-- Customer API (domain models now implemented)
 - Matching engine
 - Pass/collaboration workflow
 - Task/calendar

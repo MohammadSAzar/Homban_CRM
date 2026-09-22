@@ -274,13 +274,13 @@ with created_at/UUID ordering, join display relations, and omit child collection
 Detail prefetches images/reasons and includes contact data only after scope checks.
 
 ### Customer
-`apps.customers.Customer` is a first-class CRM record, with no REST API yet.
+`apps.customers.Customer` is a first-class CRM record with an operational REST API.
 Core fields are UUID, immutable workspace, required same-workspace consultant
 assigned_to, stable code, customer_type (`buyer`/`tenant`), status, name, mobile,
 description, is_valuable and timezone-aware created_at/updated_at. Name is required;
 unknown mobile and notes may be empty. Mobile is contact data, not a unique identity.
 Assignment does not require Range membership and remains explicit for future pass.
-No pass, Matching, Deal transitions or contact-visibility API is implemented here.
+No pass, Matching or Deal transitions are implemented. API access uses explicit actor scope.
 
 Nullable requirements are min_area/max_area (decimal square metres),
 min_building_age/max_building_age (whole years) and bedrooms. NULL means no requirement;
@@ -333,6 +333,33 @@ Regions, type, requirements and original financial values are future Matching in
 Name, mobile, description, status, assignment and valuable reasons remain essential
 operational CRM data regardless of future Matching use. Canonical dates stay timezone
 aware; Jalali display is deferred to presentation.
+
+#### Customer operational API
+`GET/POST /api/v1/customers/` lists/creates and `GET/PATCH /api/v1/customers/<uuid>/`
+retrieves/updates authorized Customers. No PUT or DELETE is available. PATCH accepts
+existing statuses without automatic Deal transitions. Workspace, code, UUID and
+timestamps are server-owned. Name is required on creation; notes/mobile may be empty.
+Changing buyer/tenant type must explicitly clear incompatible existing financial fields.
+
+`preferred_regions` writes use an array of Region UUIDs. Omission preserves links;
+an empty array clears them; replacement retains unchanged inactive links but rejects
+new inactive links, including previously removed links. Duplicate UUIDs represent one
+preference. Domain rules continue to permit Regions under inactive Cities and all
+workspace region modes. Reads expose scoped Region id/name/city/is_active in detail.
+`valuable_reasons` is an array of labels; omission preserves, `[]` clears, and duplicate
+labels fail validation. The valuable flag remains independent. Scalar, assignment,
+preference and reason changes roll back together if any validation fails.
+
+Lists are ordered by descending creation time then UUID, with 50 records per page.
+They include the authorized Customer name and requirement/financial summaries;
+mobile, description, preferred Regions and reasons are detail-only. Filtering supports
+customer_type, status, assigned_to, preferred_region, bedrooms, budget_status and
+is_valuable. `min_area` filters stored min_area >= the supplied value; `max_area`
+filters stored max_area <= the supplied value. These are requirement-bound filters,
+not Matching or overlap rules; missing bounds do not satisfy numeric filters.
+min_budget/max_budget, min_deposit_budget/max_deposit_budget and
+min_monthly_rent_budget/max_monthly_rent_budget are inclusive stored-amount filters.
+All money remains تومان; no financial conversion is performed.
 
 ## Assignment
 A consultant is the responsible owner of an assigned file/customer.
