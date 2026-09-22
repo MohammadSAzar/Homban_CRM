@@ -268,3 +268,20 @@ def test_history_protected(context, regions, target):
         obj.delete()
     assert Customer.objects.filter(pk=customer.pk).exists()
     assert customer.preferred_regions.count() == 2
+
+
+@pytest.mark.parametrize("field", ["region", "region_id", "customer", "customer_id"])
+def test_partial_preference_save_validates_the_stored_customer(context, regions, foreign, field):
+    customer = Customer.objects.create(**context)
+    other = Customer.objects.create(workspace=foreign[0], assigned_to=foreign[1], customer_type="buyer", name="دیگر")
+    link = CustomerRegionPreference.objects.create(customer=customer, region=regions[0])
+    link.customer, link.region = other, foreign[2]
+    with pytest.raises(ValidationError):
+        link.save(update_fields=[field])
+    link.refresh_from_db()
+    assert link.customer_id == customer.pk
+    assert link.region_id == regions[0].pk
+    link.region = regions[1]
+    link.save(update_fields=["region"])
+    link.refresh_from_db()
+    assert link.region_id == regions[1].pk

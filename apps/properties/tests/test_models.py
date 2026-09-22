@@ -286,3 +286,22 @@ def test_transaction_change_requires_clearing_previous_amounts(context):
     assert item.deposit_amount == 80
     assert item.monthly_rent == 0
     assert item.total_price is None
+
+
+@pytest.mark.parametrize("field", ["region", "region_id", "city", "city_id"])
+def test_partial_location_save_validates_the_stored_city(context, field):
+    item = PropertyFile.objects.create(**context)
+    city = City.objects.create(workspace=context["workspace"], name="ری")
+    region = Region.objects.create(workspace=context["workspace"], city=city, name="مرکز")
+    item.city, item.region = city, region
+    # The in-memory pair is valid, but only one relationship would be written.
+    with pytest.raises(ValidationError):
+        item.save(update_fields=[field])
+    item.refresh_from_db()
+    assert item.city_id == context["city"].pk
+    assert item.region_id == context["region"].pk
+    item.city, item.region = city, region
+    item.save(update_fields=["city", "region"])
+    item.refresh_from_db()
+    assert item.city_id == city.pk
+    assert item.region_id == region.pk

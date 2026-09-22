@@ -138,4 +138,13 @@ class CustomerRegionPreference(models.Model):
 
     def save(self, *args, **kwargs):
         self.full_clean()
+        if kwargs.get("update_fields") is not None and not self._state.adding:
+            kwargs["update_fields"] = frozenset(kwargs["update_fields"])
+            if kwargs["update_fields"]:
+                # Validate the actual partial write, not excluded in-memory changes.
+                stored = type(self).objects.using(kwargs.get("using") or self._state.db).get(pk=self.pk)
+                for field in self._meta.concrete_fields:
+                    if {field.name, field.attname} & kwargs["update_fields"]:
+                        setattr(stored, field.attname, getattr(self, field.attname))
+                stored.full_clean()
         return super().save(*args, **kwargs)

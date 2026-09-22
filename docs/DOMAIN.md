@@ -238,6 +238,8 @@ Workspace lock order. It is an internal domain operation, not an authorization A
 Bulk updates/raw SQL bypass cross-table model validation and are unsupported for
 relationship mutation. Existing User/City workspace changes must not be made through
 unvalidated maintenance writes; cross-table invariants are not SQL CHECK constraints.
+PropertyFile partial saves also validate the resulting stored row: an unsaved City
+change cannot conceal an incompatible Region-only update (or the reverse).
 
 Indexes cover workspace + status, transaction_type, region and assigned_to for normal
 CRM scoping/filtering, in addition to FK and unique-code indexes. Area, bedrooms,
@@ -283,6 +285,8 @@ aggregate creation and replacing preferences, preserving old links on failure.
 These are internal domain services, not actor authorization. Bulk writes/raw SQL
 bypass application-level cross-table checks and are unsupported; direct mutation of
 related Workspace membership also remains outside these guarantees.
+Partial saves of a CustomerRegionPreference validate the resulting stored pair,
+so excluded in-memory changes cannot conceal a cross-workspace relationship.
 
 CustomerValuableReason stores one label per child, unique within its Customer.
 Reasons are independent of PropertyFile vocabulary. is_valuable may be true with

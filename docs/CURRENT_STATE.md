@@ -184,6 +184,23 @@ Atomic internal services create aggregates and replace preferences. No Customer 
 API, frontend, Matching or Deal logic is included. PropertyFile remains unchanged.
 
 ## Tests
+### File/Customer integration audit
+The documented CRM field sets and approved Google Sheets concepts are represented,
+including operational notes, contacts, address/images and multi-region preferences.
+Matching inputs are a subset of these records, not the whole CRM domain. Current
+workspace/FK/unique indexes are sufficient to begin API and Matching query design;
+numeric indexes should follow real query plans. Future APIs must enforce actor scope
+and contact-field visibility; Matching still needs explicit null/tolerance/scoring
+rules. Neither is provided by model validation alone.
+
+The audit reproduced and fixed two partial-save integrity gaps: PropertyFile City/
+Region mismatch and CustomerRegionPreference cross-workspace links when unsaved
+in-memory changes were excluded by update_fields. Both now validate the resulting
+stored relationships. Regression tests cover each FK name and its _id form, rejected
+writes preserving history, and valid updates. No schema/index change is needed.
+Audit verification: 533 tests pass (525 existing plus 8 regression cases), with 99%
+apps/common statement coverage. Django check passes and no migration drift exists.
+
 All six apps use `tests/` packages with correctly named `__init__.py` files.
 Customer verification: 525 tests pass (468 existing plus 57 new), with 99% overall
 apps/common statement coverage and 100% for Customer models/services/guards.
