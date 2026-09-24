@@ -2,7 +2,7 @@
 
 This document describes workspace-scoped authentication, organizational user management,
 location configuration, Range Management, PropertyFile and Customer APIs, and PropertyFile/Customer
-domain foundations on 2026-09-23.
+domain foundations on 2026-09-24.
 
 ## Repository
 Root folder:
@@ -363,10 +363,23 @@ including JWT authentication and pagination count, independent of result size.
 Location policies, read/write/filter serializers, and transactional mutation services
 live in apps/locations. Services recheck current management eligibility while locking
 the workspace, actor, and affected rows. Existing model uniqueness and workspace
-validation are retained. No schema migrations or dependencies were added.
+validation are retained. The Region policy migration is described below; no dependencies were added.
 
-Mode changes preserve all data in none/custom/divar modes and trigger no network
-requests or synchronization. City deactivation does not rewrite Region active flags.
+Workspace Region policy now permits custom/divar as the only operational values;
+NULL is the default incomplete-setup state. One taxonomy/collection belongs to the
+Workspace, shared by every Range/user, with no cross-workspace Region sharing.
+The settings API reads NULL and only accepts custom/divar writes. Existing agency
+manager OR workspace-owner configuration authority is unchanged.
+Migration organizations/0003_workspace_region_policy makes the field nullable,
+converts legacy none to NULL, preserves custom/divar and adds a database CHECK.
+Unknown stored values stop migration for review; no business mode is invented.
+The development data check on 2026-09-24 found zero Workspace rows. Migration tests
+exercise legacy rows and preserve their City/Region data. Old migrations are unchanged.
+Verification: 180 focused tests and all 715 regression tests pass, with 99% apps/common
+statement coverage. Django check passes and migration dry-run reports no drift.
+The migration was exercised in the test database; applying it to development remains
+an explicit deployment step. PropertyFile/Customer requiredness is unchanged.
+Mode changes preserve all data and trigger no network requests or synchronization. City deactivation does not rewrite Region active flags.
 Divar synchronization remains future work owned by a separate integration service.
 Location tests cover role/owner access, non-destructive mode changes, source protection,
 payload allowlists, workspace isolation, uniqueness, city reassignment, deactivation,

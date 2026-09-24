@@ -64,7 +64,7 @@ def test_location_management_role_and_owner_matrix(world, role, owner):
         response = client.patch(endpoint(kind, obj), {"is_active": False}, format="json")
         assert response.status_code == (200 if allowed else 403)
     assert client.get(MODE).status_code == 200
-    assert client.patch(MODE, {"region_mode": "none"}, format="json").status_code == (200 if allowed else 403)
+    assert client.patch(MODE, {"region_mode": "custom"}, format="json").status_code == (200 if allowed else 403)
 
 
 @pytest.mark.parametrize("mode", Workspace.RegionMode.values)
@@ -80,20 +80,39 @@ def test_mode_switch_preserves_data_and_manual_management(world, mode):
     assert client.get(endpoint("regions", world.region)).status_code == 200
 
 
-@pytest.mark.parametrize("data", [{}, {"region_mode": "invalid"}, {"region_mode": None}, {"workspace_id": "x", "region_mode": "none"}])
+@pytest.mark.parametrize("data", [{}, {"region_mode": "none"}, {"region_mode": ""}, {"region_mode": "invalid"}, {"region_mode": None}, {"workspace_id": "x", "region_mode": "custom"}])
 def test_mode_invalid_payload_rejected(world, data):
     assert client_for(world.actor).patch(MODE, data, format="json").status_code == 400
     world.workspace.refresh_from_db()
-    assert world.workspace.region_mode == "custom"
+    assert world.workspace.region_mode is None
 
 
 def test_mode_server_workspace_ignores_query_and_header(world):
     client = client_for(world.actor)
-    response = client.patch(MODE + "?workspace=" + str(world.foreign_workspace.pk), {"region_mode": "none"},
+    response = client.patch(MODE + "?workspace=" + str(world.foreign_workspace.pk), {"region_mode": "custom"},
                             format="json", HTTP_X_WORKSPACE_SLUG=world.foreign_workspace.slug)
     assert response.status_code == 200
     world.foreign_workspace.refresh_from_db()
-    assert world.foreign_workspace.region_mode == "custom"
+    assert world.foreign_workspace.region_mode is None
+
+
+def test_unconfigured_mode_is_readable_and_configured_mode_cannot_be_cleared(world):
+    client = client_for(world.actor)
+    assert client.get(MODE).data == {"region_mode": None, "region_mode_display": None}
+    assert client.patch(MODE, {"region_mode": "custom"}, format="json").status_code == 200
+    assert client.patch(MODE, {"region_mode": None}, format="json").status_code == 400
+    world.workspace.refresh_from_db()
+    assert world.workspace.region_mode == "custom"
+
+
+def test_mode_switch_preserves_exact_location_rows(world):
+    client = client_for(world.actor)
+    cities = list(City.objects.order_by("pk").values())
+    regions = list(Region.objects.order_by("pk").values())
+    for mode in ("custom", "divar", "custom"):
+        assert client.patch(MODE, {"region_mode": mode}, format="json").status_code == 200
+        assert list(City.objects.order_by("pk").values()) == cities
+        assert list(Region.objects.order_by("pk").values()) == regions
 
 
 @pytest.mark.parametrize("kind", ["cities", "regions"])
@@ -281,7 +300,7 @@ def test_django_privileges_do_not_grant_location_management(world):
     User.objects.filter(pk=world.actor.pk).update(role="admin", is_staff=True, is_superuser=True)
     client = client_for(world.actor)
     assert client.post(endpoint("cities"), {"name": "جدید"}, format="json").status_code == 403
-    assert client.patch(MODE, {"region_mode": "none"}, format="json").status_code == 403
+    assert client.patch(MODE, {"region_mode": "custom"}, format="json").status_code == 403
 
 
 def test_revoked_ownership_is_checked_using_current_database(world):
@@ -289,9 +308,9 @@ def test_revoked_ownership_is_checked_using_current_database(world):
     world.actor.refresh_from_db()
     client = client_for(world.actor)
     User.objects.filter(pk=world.actor.pk).update(is_workspace_owner=False)
-    assert client.patch(MODE, {"region_mode": "none"}, format="json").status_code == 403
+    assert client.patch(MODE, {"region_mode": "custom"}, format="json").status_code == 403
     with pytest.raises(PermissionDenied):
-        set_region_mode(actor=world.actor, data={"region_mode": "none"})
+        set_region_mode(actor=world.actor, data={"region_mode": "custom"})
 
 
 @pytest.mark.parametrize("manager", [False, True])
@@ -390,7 +409,7 @@ def test_mode_rejects_workspace_override(world, field):
     assert response.status_code == 400 and field in response.data
     world.workspace.refresh_from_db()
     world.foreign_workspace.refresh_from_db()
-    assert world.workspace.region_mode == world.foreign_workspace.region_mode == "custom"
+    assert world.workspace.region_mode is None and world.foreign_workspace.region_mode is None
 
 
 @pytest.mark.parametrize("kind", ["cities", "regions"])

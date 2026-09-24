@@ -134,10 +134,14 @@ Conceptual hierarchy:
 - City
 - Region
 
-Workspace location strategy:
-- `none`
-- `custom`
-- `divar`
+Workspace Region configuration is workspace-wide: exactly one operational taxonomy,
+`custom` OR `divar`, shared by all users and Ranges. It is never a per-user,
+per-consultant or per-Range setting. A custom Workspace has one Workspace-owned
+collection of Regions, grouped by City, not multiple independent Region systems.
+`region_mode = NULL` (the default) means setup is incomplete, not an operating mode.
+`none` is no longer valid. Configuration must explicitly choose custom or divar.
+Cities/Regions, including future Divar-derived records, remain stored within each
+Workspace boundary; there is no cross-workspace Region sharing or business mapping.
 
 External-source identity may be stored separately from internal identity.
 
@@ -168,21 +172,28 @@ cannot be supplied or changed. External-source records (currently Divar) are
 read-only through this API, including their active state, and belong to a future
 integration service's synchronization lifecycle.
 
-Changing `region_mode` between `none`, `custom`, and `divar` changes configuration
-only. It never deletes, rewrites, or synchronizes Cities/Regions. Manual configuration
-remains available in every mode. `none` does not hide configured data by itself;
-later File/Customer workflows may make Region optional. Divar synchronization and
-network integration remain future work.
+The settings API reads NULL/custom/divar, but accepts only custom or divar for
+configuration. It rejects none, NULL, blank and arbitrary write values. Switching
+mode never deletes, rewrites or synchronizes Cities/Regions, nor changes their source.
+Retained records are history in the same Workspace collection, not separate taxonomies.
+Existing manual location management remains available; no source-based filtering or
+Divar synchronization is introduced. Setup state does not change existing record
+requiredness or block the existing operational APIs in this focused change.
 
 ## Records
+Future crawler/API/voice-AI ingestion may use incomplete Draft/Staging records.
+Canonical PropertyFile/Customer records will require complete operational data before
+promotion. This is a future boundary only: no Draft/Staging implementation or change
+to current canonical requiredness is included here.
+
 ### File
 `apps.properties.PropertyFile` is the core stored CRM record, with an operational REST API.
 It has a UUID, immutable workspace, required same-workspace consultant assignee,
 server-generated code, transaction type (`sale`/`rent`), status, and timezone-aware
 created/updated timestamps. Range membership is not required.
 
-City is required; Region is optional in all three region modes (`none`, `custom`,
-`divar`). Both must belong to the file's workspace, and Region.city must equal the
+City is required; Region remains optional with custom/divar or incomplete setup
+(NULL); this change does not alter PropertyFile requiredness. Both must belong to the file's workspace, and Region.city must equal the
 file's City. Inactive related records may remain linked for historical continuity.
 A Region with linked files cannot move to a City inconsistent with those files.
 Address and description are explicit text fields. Owner name, owner phone, and

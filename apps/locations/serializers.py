@@ -40,7 +40,7 @@ class RegionModeWriteSerializer(StrictInputSerializer):
 
 
 class RegionModeReadSerializer(serializers.ModelSerializer):
-    region_mode_display = serializers.CharField(source="get_region_mode_display", read_only=True)
+    region_mode_display = serializers.CharField(source="get_region_mode_display", read_only=True, allow_null=True)
 
     class Meta:
         model = Workspace

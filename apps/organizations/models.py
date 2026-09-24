@@ -12,7 +12,6 @@ class Workspace(models.Model):
         CONSULTANT = "consultant", _("مشاور")
 
     class RegionMode(models.TextChoices):
-        NONE = "none", _("بدون تفکیک منطقه")
         CUSTOM = "custom", _("منطقه‌بندی اختصاصی")
         DIVAR = "divar", _("منطقه‌بندی دیوار")
 
@@ -59,11 +58,20 @@ class Workspace(models.Model):
     region_mode = models.CharField(
         max_length=20,
         choices=RegionMode.choices,
-        default=RegionMode.CUSTOM,
+        default=None,
+        null=True,
+        blank=True,
         verbose_name=_("نوع منطقه‌بندی"),
     )
 
     class Meta:
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(region_mode__isnull=True) | models.Q(region_mode__in=["custom", "divar"]),
+                name="workspace_valid_region_mode",
+                violation_error_message=_("نوع منطقه‌بندی معتبر نیست."),
+            ),
+        ]
         verbose_name = _("مجموعه")
         verbose_name_plural = _("مجموعه‌ها")
         ordering = ["name"]

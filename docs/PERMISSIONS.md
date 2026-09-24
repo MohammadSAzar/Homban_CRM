@@ -193,6 +193,11 @@ Mutation services recheck current actor permission inside a transaction, locking
 workspace before actor and affected records. This follows the existing management
 write pattern; arbitrary ORM writes outside these services are not covered by it.
 Mode changes are non-destructive and never invoke external synchronization.
+Region configuration is one Workspace-wide custom OR divar taxonomy, never per Range
+or consultant. NULL denotes incomplete setup only; operational configuration rejects
+none and NULL. Agency managers and workspace-owner purchasers (including range managers
+and individual consultants) configure their own Workspace using the existing authority.
+No unrelated operational permissions are broadened; all Regions remain Workspace-owned.
 
 ## Sensitive fields
 ### Customer API policy

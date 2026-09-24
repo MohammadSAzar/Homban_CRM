@@ -63,7 +63,7 @@ def test_valid_file_round_trip(context, kind, amounts):
     assert timezone.is_aware(item.updated_at)
 
 
-@pytest.mark.parametrize("mode", ["none", "custom", "divar"])
+@pytest.mark.parametrize("mode", [None, "custom", "divar"])
 def test_region_optional_in_every_mode(context, mode):
     workspace = context["workspace"]
     workspace.region_mode = mode
