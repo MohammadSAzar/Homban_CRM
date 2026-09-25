@@ -53,7 +53,7 @@ def world():
     foreign_region = Region.objects.create(workspace=foreign_workspace, city=foreign_city, name="ونک")
     def customer(assignee, ws=workspace, location=region):
         return create_customer(workspace=ws, assigned_to=assignee, customer_type="buyer",
-            name="نام محرمانه", mobile="09121111111", description="یادداشت محرمانه",
+            min_area=0, max_area=100, bedrooms=0, budget=0, name="نام محرمانه", mobile="09121111111", description="یادداشت محرمانه",
             preferred_regions=[location], valuable_reasons=["آماده خرید"])
     own = customer(consultant)
     managed = customer(second)
@@ -63,7 +63,9 @@ def world():
 
 
 def body(**changes):
-    return {"customer_type": "buyer", "name": "مشتری", **changes}
+    amounts = {"deposit_budget": 0, "monthly_rent_budget": 0} if changes.get("customer_type") == "tenant" else {"budget": 0}
+    return {"customer_type": "buyer", "name": "مشتری", "min_area": 0, "max_area": 100,
+            "bedrooms": 0, "all_regions": "preferred_regions" not in changes, **amounts, **changes}
 
 
 @pytest.mark.parametrize("actor", ["agency", "manager", "consultant"])
@@ -249,7 +251,7 @@ def test_region_replacement_inactive_retention_and_removal(world):
     assert world.own.preferred_regions.count() == 2
     assert client.patch(url(world.own), {"preferred_regions": [str(world.other_region.pk)]}, format="json").status_code == 200
     assert client.patch(url(world.own), {"preferred_regions": [str(world.region.pk)]}, format="json").status_code == 400
-    assert client.patch(url(world.own), {"preferred_regions": []}, format="json").status_code == 200
+    assert client.patch(url(world.own), {"all_regions": True}, format="json").status_code == 200
     assert world.own.preferred_regions.count() == 0
 
 
@@ -298,6 +300,9 @@ def test_buyer_filters(world, params):
         setattr(world.own, field, value)
     world.own.save()
     world.managed.customer_type = "tenant"
+    world.managed.budget = None
+    world.managed.deposit_budget = 0
+    world.managed.monthly_rent_budget = 0
     world.managed.min_area = 50
     world.managed.max_area = 200
     world.managed.save()
@@ -312,6 +317,7 @@ def test_buyer_filters(world, params):
 ])
 def test_tenant_financial_filters(world, params):
     world.own.customer_type = "tenant"
+    world.own.budget = None
     world.own.deposit_budget = 100
     world.own.monthly_rent_budget = 20
     world.own.save()
@@ -341,7 +347,7 @@ def test_queries_do_not_grow(world, actor):
         with CaptureQueriesContext(connection) as queries:
             response = client.get(url(world.own))
         assert response.status_code == 200 and len(queries) == 4
-        create_customer(workspace=world.workspace, assigned_to=world.consultant, customer_type="buyer", name="جدید",
+        create_customer(workspace=world.workspace, assigned_to=world.consultant, customer_type="buyer", name="جدید", min_area=0, max_area=100, bedrooms=0, budget=0,
             preferred_regions=[world.region, world.other_region], valuable_reasons=["یک", "دو"])
         world.own.preferred_regions.add(world.other_region)
 
@@ -401,7 +407,7 @@ def test_invalid_legacy_relationships_do_not_leak(world):
 
 def test_pagination(world):
     for _ in range(50):
-        Customer.objects.create(workspace=world.workspace, assigned_to=world.consultant, customer_type="buyer", name="مشتری")
+        Customer.objects.create(workspace=world.workspace, assigned_to=world.consultant, customer_type="buyer", name="مشتری", min_area=0, max_area=100, bedrooms=0, budget=0, all_regions=True)
     client = client_for(world.consultant)
     first = client.get(BASE).data
     second = client.get(BASE, {"page": 2}).data

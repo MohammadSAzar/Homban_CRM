@@ -37,7 +37,7 @@ class CustomerListSerializer(serializers.ModelSerializer):
             "id", "code", "assigned_to", "name", "customer_type", "customer_type_display",
             "status", "status_display", "min_area", "max_area", "min_building_age",
             "max_building_age", "bedrooms", "budget", "budget_status", "budget_status_display",
-            "deposit_budget", "monthly_rent_budget", "is_valuable", "created_at", "updated_at",
+            "deposit_budget", "monthly_rent_budget", "is_valuable", "all_regions", "created_at", "updated_at",
         )
 
 

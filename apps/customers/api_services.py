@@ -9,14 +9,14 @@ from apps.locations.models import Region
 from apps.organizations.models import Workspace
 from .models import Customer, CustomerValuableReason
 from .policies import require_customer_actor, scoped_consultants, visible_customers
-from .services import create_customer, set_preferred_regions
+from .services import create_customer
 
 
 WRITE_FIELDS = (
     "assigned_to", "customer_type", "status", "name", "mobile", "description",
     "is_valuable", "min_area", "max_area", "min_building_age", "max_building_age",
     "bedrooms", "budget", "budget_status", "deposit_budget", "monthly_rent_budget",
-    "preferred_regions", "valuable_reasons",
+    "all_regions", "preferred_regions", "valuable_reasons",
 )
 
 
@@ -69,11 +69,15 @@ def save_customer(*, actor, data, customer_id=None):
                 workspace=actor.workspace, preferred_regions=regions or (),
                 valuable_reasons=reasons or (), **fields,
             )
+        if "customer_type" in fields and fields["customer_type"] != item.customer_type:
+            incompatible = ("budget", "budget_status") if fields["customer_type"] == "tenant" else ("deposit_budget", "monthly_rent_budget")
+            for key in incompatible:
+                if fields.get(key) is not None:
+                    raise ValidationError({key: _("این مقدار برای نوع مشتری انتخاب‌شده باید خالی باشد.")})
+                fields[key] = None
         for key, value in fields.items():
             setattr(item, key, value)
-        item.save()
-        if regions is not None:
-            set_preferred_regions(customer=item, regions=regions)
+        item.save(**({"preferred_regions": regions} if regions is not None else {}))
         if reasons is not None:
             item.valuable_reasons.all().delete()
             for reason in reasons:

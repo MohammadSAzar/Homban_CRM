@@ -200,14 +200,35 @@ Customer, CustomerRegionPreference and CustomerValuableReason are implemented in
 `apps/customers`, with initial migration `customers/0001_initial.py`.
 Buyer/tenant money remains separate in تومان. Buyer budget_status is nullable with
 the confirmed cash/cash_plus_property Persian choices; tenants cannot use it.
-Models include explicit name/mobile/notes, assignment, code/status, nullable area/age
-bounds and bedrooms, multiple Region preferences and customer-specific valuable reasons.
+Models include explicit name/mobile/notes, assignment, code/status, required area
+bounds and bedrooms, optional age bounds, explicit/all-Region geography and
+customer-specific valuable reasons.
 SQL CHECKs protect numeric/bound/type invariants. Model and forward/reverse M2M guards
 protect workspace integrity and reject new inactive Region links. Existing inactive
 links may remain. Region references and business parents are protected from deletion.
 Atomic internal services create aggregates and replace preferences. The Customer REST
 API now authorizes these operations; frontend, Matching and Deal logic remain future work.
 PropertyFile remains unchanged by the Customer API feature.
+
+### Canonical Customer completeness
+Migration `customers/0002_canonical_completeness.py` requires min_area, max_area and
+bedrooms, buyer budget, and both tenant financial amounts. Zero is valid; bounds and
+buyer/tenant separation are enforced. Buyer budget_status stays nullable with no
+forced choice. all_regions defaults to False: explicit geography requires one or
+more Regions; True means all currently active Regions in this Workspace with no
+stored links/backfill. Ambiguous payloads fail. Geography and financial transitions,
+scalar fields, assignment and reasons are atomic. Model partial saves and direct
+M2M/through writes preserve geography; bulk/raw writes remain unsupported.
+Migration preflight rejects incomplete/zero-preference legacy rows rather than
+inventing values. Development inspection found no Customer tables/rows, so no data
+repair was needed. The migration remains an explicit deployment step.
+PropertyFile behavior and Customer permissions are unchanged. Incomplete extraction
+belongs to future Draft/Staging, which is not implemented.
+Verification: 765 tests pass (740 existing plus 25 new cases), with 99% overall
+apps/common coverage. Customer-focused checks passed, including migration refusal,
+requiredness, geography transitions/deletion guards, partial saves and aggregate
+rollback. List/detail query counts remain 3/4; Django checks and migration-drift
+checks pass. No PropertyFile code or permission policy was changed.
 
 ## Tests
 ### File/Customer integration audit
@@ -276,9 +297,11 @@ bypass or general cross-owner browsing exists. Future Matching visibility is sep
 Creation/reassignment requires an active scoped consultant; workspace/code/timestamps
 remain server-owned. Contact data is scoped before serialization. Compact lists include
 name; mobile, description, preferred Regions and reasons appear in authorized details.
-PATCH replaces supplied Region/reason arrays transactionally; omission preserves them,
-`[]` clears them. Existing inactive Region links may remain, but new ones are rejected.
-No hard delete or schema change is introduced. Domain validation is reused.
+PATCH replaces supplied Region/reason arrays transactionally; omission preserves them
+unless switching to all_regions=True. Empty reasons clear; empty explicit geography
+is rejected. Existing inactive Region links may remain, but new ones are rejected.
+No hard delete is introduced. Domain validation is reused; canonical requiredness
+is documented above.
 
 django-filter supports type/status/assignee/preferred Region, area requirement bounds,
 bedrooms, buyer budget, tenant deposit/monthly rent budgets, budget status and valuable

@@ -183,8 +183,9 @@ requiredness or block the existing operational APIs in this focused change.
 ## Records
 Future crawler/API/voice-AI ingestion may use incomplete Draft/Staging records.
 Canonical PropertyFile/Customer records will require complete operational data before
-promotion. No Draft/Staging implementation is included. PropertyFile canonical
-completeness is enforced below; Customer requiredness is unchanged.
+promotion. No Draft/Staging implementation is included. Canonical PropertyFile
+and Customer completeness are enforced below. Incomplete extracted data cannot
+become canonical until validation succeeds.
 
 ### File
 `apps.properties.PropertyFile` is the core stored CRM record, with an operational REST API.
@@ -308,30 +309,40 @@ unknown mobile and notes may be empty. Mobile is contact data, not a unique iden
 Assignment does not require Range membership and remains explicit for future pass.
 No pass, Matching or Deal transitions are implemented. API access uses explicit actor scope.
 
-Nullable requirements are min_area/max_area (decimal square metres),
-min_building_age/max_building_age (whole years) and bedrooms. NULL means no requirement;
-zero is valid. Negative values and lower bounds exceeding existing upper bounds are
-rejected by model validation and database CHECKs.
+Canonical min_area/max_area (decimal square metres) and bedrooms are required;
+zero is valid and min_area must not exceed max_area. Building-age bounds remain
+nullable (no requirement). Negative values and invalid bounds are rejected by model
+validation and database CHECKs; required core fields are NOT NULL.
 
-Buyers have nullable budget and budget_status. The confirmed Google Sheets choices are
+Buyers require nonnegative budget; budget_status remains nullable. The confirmed Google Sheets choices are
 `cash` — کاملاً نقد and `cash_plus_property` — بخشی نقد + آپارتمان.
 No choice is forced: default is NULL and empty strings normalize to NULL.
-Tenants have separate deposit_budget and monthly_rent_budget. Buyer tenant-only
+Tenants require separate nonnegative deposit_budget and monthly_rent_budget; zero is valid for either. Buyer tenant-only
 amounts must be NULL; tenant budget and budget_status must be NULL. All money uses
 Decimal (two decimal places), in Iranian **تومان**. No automatic conversion occurs.
 
 preferred_regions is a real M2M via CustomerRegionPreference, with a unique
-(customer, region) pair. Zero or multiple Regions are allowed, including Regions in
-different Cities in the same workspace; there is no duplicated City preference.
+(customer, region) pair. all_regions defaults to False: canonical creation must
+explicitly select all_regions=True or provide at least one preferred Region.
+True requires empty M2M links and means every currently active Region in this
+Workspace, including future active additions, without backfill. False requires one
+or more explicit Regions, possibly in different Cities; there is no duplicated City
+preference. No Regions from another Workspace count. This defines future Matching
+semantics only; no Matching implementation exists.
 Every Region (and its City) must belong to the customer's workspace. New links to
 inactive Regions are rejected. Existing inactive preferences can remain or be removed;
 removing then re-adding is a new assignment. City active state is not an additional
-preference rule in this foundation. All workspace region modes allow empty preferences.
+preference rule. Empty explicit preferences are never a canonical state.
 
 An m2m_changed guard protects forward/reverse add/set because Django's M2M manager
 bulk-creates links without calling the through model's save. Direct through-model
-saves also validate. The service uses Workspace-row locking and transactions for
-aggregate creation and replacing preferences, preserving old links on failure.
+saves also validate. Customer.save(preferred_regions=...) and domain/API services
+use Workspace-row locking and transactions for aggregate creation and replacement.
+Replacement adds validated links before removing old ones. Direct forward/reverse
+remove/clear and through-model deletions cannot remove the last explicit preference;
+use the aggregate service to replace the full set. all_regions=True clears links
+atomically. Customer partial saves validate the effective stored state, not excluded
+in-memory changes. Failed changes preserve old links.
 These are internal domain services, not actor authorization. Bulk writes/raw SQL
 bypass application-level cross-table checks and are unsupported; direct mutation of
 related Workspace membership also remains outside these guarantees.
@@ -365,13 +376,17 @@ aware; Jalali display is deferred to presentation.
 retrieves/updates authorized Customers. No PUT or DELETE is available. PATCH accepts
 existing statuses without automatic Deal transitions. Workspace, code, UUID and
 timestamps are server-owned. Name is required on creation; notes/mobile may be empty.
-Changing buyer/tenant type must explicitly clear incompatible existing financial fields.
+Type changes require target-type financial values; the API clears incompatible
+old fields atomically and rejects supplied incompatible amounts. Missing target
+values reject the transition; no amount is invented.
 
-`preferred_regions` writes use an array of Region UUIDs. Omission preserves links;
-an empty array clears them; replacement retains unchanged inactive links but rejects
+`all_regions` is returned in both list and detail. `preferred_regions` writes use
+an array of Region UUIDs. Omission preserves links unless switching to all_regions=True,
+which clears them. True plus nonempty explicit Regions is rejected. Switching back
+to False requires at least one supplied Region in the same operation. An empty
+array while False is rejected. Replacement retains unchanged inactive links but rejects
 new inactive links, including previously removed links. Duplicate UUIDs represent one
-preference. Domain rules continue to permit Regions under inactive Cities and all
-workspace region modes. Reads expose scoped Region id/name/city/is_active in detail.
+preference. Regions under inactive Cities remain permitted; Workspace setup policy is unchanged. Reads expose scoped Region id/name/city/is_active in detail.
 `valuable_reasons` is an array of labels; omission preserves, `[]` clears, and duplicate
 labels fail validation. The valuable flag remains independent. Scalar, assignment,
 preference and reason changes roll back together if any validation fails.
@@ -382,7 +397,8 @@ mobile, description, preferred Regions and reasons are detail-only. Filtering su
 customer_type, status, assigned_to, preferred_region, bedrooms, budget_status and
 is_valuable. `min_area` filters stored min_area >= the supplied value; `max_area`
 filters stored max_area <= the supplied value. These are requirement-bound filters,
-not Matching or overlap rules; missing bounds do not satisfy numeric filters.
+not Matching or overlap rules. preferred_region filters explicit links only;
+it does not expand all_regions into Matching candidates.
 min_budget/max_budget, min_deposit_budget/max_deposit_budget and
 min_monthly_rent_budget/max_monthly_rent_budget are inclusive stored-amount filters.
 All money remains تومان; no financial conversion is performed.

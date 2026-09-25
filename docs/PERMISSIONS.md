@@ -227,7 +227,10 @@ Services lock Workspace, current actor and Customer, recheck scope, and reuse do
 validation and preference services. Preferred Regions must belong to the same
 Workspace (including their City); new inactive links are rejected, retained inactive
 links remain visible. Preferences and reasons are replaced transactionally with the
-parent update. No Customer hard-delete endpoint exists.
+parent update. all_regions=True stores no explicit links; False requires at least
+one. Switching to all clears links atomically; switching to explicit requires supplied
+Regions. This does not broaden actor scope or expose cross-owner data.
+No Customer hard-delete endpoint exists.
 
 ### PropertyFile API policy
 
