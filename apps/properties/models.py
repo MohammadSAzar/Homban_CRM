@@ -1,13 +1,22 @@
 import uuid
+from decimal import Decimal
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator
-from django.db import models
+from django.db import models, transaction
 from django.utils.translation import gettext_lazy as _
 
 
 NONNEGATIVE = MinValueValidator(0, message=_("مقدار نمی‌تواند منفی باشد."))
+
+
+def derive_price(total_price, area):
+    """Floor the exact rational quotient to whole millions of toman."""
+    numerator, denominator = total_price.as_integer_ratio()
+    area_numerator, area_denominator = area.as_integer_ratio()
+    millions = (numerator * area_denominator) // (denominator * area_numerator * 1_000_000)
+    return Decimal(millions * 1_000_000)
 
 
 class PropertyFile(models.Model):
@@ -32,13 +41,13 @@ class PropertyFile(models.Model):
     transaction_type = models.CharField(max_length=10, choices=TransactionType.choices, verbose_name=_("نوع معامله"))
     status = models.CharField(max_length=10, choices=Status.choices, default=Status.ACTIVE, verbose_name=_("وضعیت"))
     city = models.ForeignKey("locations.City", on_delete=models.PROTECT, related_name="property_files", verbose_name=_("شهر"))
-    region = models.ForeignKey("locations.Region", on_delete=models.PROTECT, related_name="property_files", null=True, blank=True, verbose_name=_("منطقه"))
+    region = models.ForeignKey("locations.Region", on_delete=models.PROTECT, related_name="property_files", verbose_name=_("منطقه"))
     address = models.TextField(blank=True, verbose_name=_("نشانی"))
     owner_name = models.CharField(max_length=150, blank=True, verbose_name=_("نام مالک"))
     owner_phone = models.CharField(max_length=20, blank=True, verbose_name=_("تلفن مالک"))
     visit_contact_phone = models.CharField(max_length=20, blank=True, verbose_name=_("تلفن هماهنگی بازدید"))
-    area = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True, validators=[NONNEGATIVE], verbose_name=_("مساحت (متر مربع)"))
-    bedrooms = models.PositiveSmallIntegerField(null=True, blank=True, validators=[NONNEGATIVE], verbose_name=_("تعداد اتاق خواب"))
+    area = models.DecimalField(max_digits=12, decimal_places=2, validators=[MinValueValidator(Decimal("0.01"))], verbose_name=_("مساحت (متر مربع)"))
+    bedrooms = models.PositiveSmallIntegerField( validators=[NONNEGATIVE], verbose_name=_("تعداد اتاق خواب"))
     total_floors = models.PositiveSmallIntegerField(null=True, blank=True, validators=[NONNEGATIVE], verbose_name=_("تعداد طبقات"))
     units_per_floor = models.PositiveSmallIntegerField(null=True, blank=True, validators=[NONNEGATIVE], verbose_name=_("تعداد واحد در طبقه"))
     unit_floor = models.PositiveSmallIntegerField(null=True, blank=True, validators=[NONNEGATIVE], verbose_name=_("طبقه واحد"))
@@ -47,7 +56,7 @@ class PropertyFile(models.Model):
     storage = models.BooleanField(null=True, blank=True, default=None, verbose_name=_("انباری"))
     elevator = models.BooleanField(null=True, blank=True, default=None, verbose_name=_("آسانسور"))
     balcony = models.BooleanField(null=True, blank=True, default=None, verbose_name=_("بالکن"))
-    price_per_square_meter = models.DecimalField(max_digits=20, decimal_places=2, null=True, blank=True, validators=[NONNEGATIVE], verbose_name=_("قیمت هر متر مربع (تومان)"))
+    price_per_square_meter = models.DecimalField(editable=False, max_digits=20, decimal_places=2, null=True, blank=True, validators=[NONNEGATIVE], verbose_name=_("قیمت هر متر مربع (تومان)"))
     total_price = models.DecimalField(max_digits=20, decimal_places=2, null=True, blank=True, validators=[NONNEGATIVE], verbose_name=_("قیمت کل (تومان)"))
     deposit_amount = models.DecimalField(max_digits=20, decimal_places=2, null=True, blank=True, validators=[NONNEGATIVE], verbose_name=_("ودیعه (تومان)"))
     monthly_rent = models.DecimalField(max_digits=20, decimal_places=2, null=True, blank=True, validators=[NONNEGATIVE], verbose_name=_("اجاره ماهانه (تومان)"))
@@ -64,7 +73,8 @@ class PropertyFile(models.Model):
             models.CheckConstraint(condition=models.Q(**{f"{field}__gte": 0}) | models.Q(**{f"{field}__isnull": True}), name=f"pf_{field}_nonnegative", violation_error_message=_("مقدار نمی‌تواند منفی باشد."))
             for field in ("area", "bedrooms", "total_floors", "units_per_floor", "unit_floor", "building_age", "price_per_square_meter", "total_price", "deposit_amount", "monthly_rent")
         ] + [
-            models.CheckConstraint(condition=(models.Q(transaction_type="sale", deposit_amount__isnull=True, monthly_rent__isnull=True) | models.Q(transaction_type="rent", price_per_square_meter__isnull=True, total_price__isnull=True)), name="pf_transaction_financials", violation_error_message=_("مبالغ باید با نوع معامله سازگار باشند.")),
+            models.CheckConstraint(condition=models.Q(area__gt=0), name="pf_area_positive", violation_error_message=_("مساحت باید بیشتر از صفر باشد.")),
+            models.CheckConstraint(condition=(models.Q(transaction_type="sale", total_price__isnull=False, price_per_square_meter__isnull=False, deposit_amount__isnull=True, monthly_rent__isnull=True) | models.Q(transaction_type="rent", deposit_amount__isnull=False, monthly_rent__isnull=False, price_per_square_meter__isnull=True, total_price__isnull=True)), name="pf_transaction_financials", violation_error_message=_("مبالغ باید با نوع معامله سازگار باشند.")),
             models.CheckConstraint(condition=models.Q(status__in=["active", "inactive", "sold", "rented", "archived"]), name="pf_valid_status", violation_error_message=_("وضعیت فایل معتبر نیست.")),
             models.CheckConstraint(condition=~models.Q(code=""), name="pf_code_not_empty", violation_error_message=_("کد فایل الزامی است.")),
         ]
@@ -78,6 +88,22 @@ class PropertyFile(models.Model):
     def clean(self):
         super().clean()
         errors = {}
+        original = None
+        if not self._state.adding:
+            original = type(self).objects.filter(pk=self.pk).values("workspace_id", "region_id").first()
+        if self.transaction_type == "rent":
+            self.price_per_square_meter = None
+        elif (self.transaction_type == "sale" and isinstance(self.area, Decimal)
+              and isinstance(self.total_price, Decimal) and self.area.is_finite()
+              and self.total_price.is_finite() and self.area > 0 and self.total_price >= 0):
+            self.price_per_square_meter = derive_price(self.total_price, self.area)
+            try:
+                self._meta.get_field("price_per_square_meter").clean(self.price_per_square_meter, self)
+            except ValidationError as error:
+                errors["price_per_square_meter"] = error.messages
+        for field in {"sale": ("total_price",), "rent": ("deposit_amount", "monthly_rent")}.get(self.transaction_type, ()):
+            if getattr(self, field) is None:
+                errors[field] = _("این مبلغ برای نوع معامله انتخاب‌شده الزامی است.")
         expected_code = f"PF-{self.id.hex.upper()}" if isinstance(self.id, uuid.UUID) else None
         if expected_code:
             if self.code and self.code != expected_code:
@@ -93,10 +119,12 @@ class PropertyFile(models.Model):
                     errors[field] = _("رکورد انتخاب‌شده متعلق به این مجموعه نیست.")
                 elif field == "assigned_to" and related.role != "consultant":
                     errors[field] = _("فایل باید به یک مشاور اختصاص یابد.")
-                elif field == "region" and related.city_id != self.city_id:
-                    errors[field] = _("منطقه باید متعلق به شهر فایل باشد.")
+                elif field == "region":
+                    if related.city_id != self.city_id or related.city.workspace_id != self.workspace_id:
+                        errors[field] = _("منطقه باید متعلق به شهر و مجموعه فایل باشد.")
+                    elif not related.is_active and (original is None or original["region_id"] != related.pk):
+                        errors[field] = _("انتخاب منطقه غیرفعال مجاز نیست.")
         if not self._state.adding:
-            original = type(self).objects.filter(pk=self.pk).values("workspace_id").first()
             if original and original["workspace_id"] != self.workspace_id:
                 errors["workspace"] = _("مجموعه فایل قابل تغییر نیست.")
         incompatible = {"sale": ("deposit_amount", "monthly_rent"), "rent": ("price_per_square_meter", "total_price")}
@@ -107,17 +135,27 @@ class PropertyFile(models.Model):
             raise ValidationError(errors)
 
     def save(self, *args, **kwargs):
-        self.full_clean()
-        if kwargs.get("update_fields") is not None and not self._state.adding:
-            kwargs["update_fields"] = frozenset(kwargs["update_fields"])
-            if kwargs["update_fields"]:
-                # Validate the actual partial write, not excluded in-memory changes.
-                stored = type(self).objects.using(kwargs.get("using") or self._state.db).get(pk=self.pk)
+        update_fields = kwargs.get("update_fields")
+        if update_fields is not None:
+            update_fields = frozenset(update_fields)
+            if not update_fields:
+                return
+        using = kwargs.get("using") or self._state.db or "default"
+        with transaction.atomic(using=using):
+            stored = None
+            if not self._state.adding:
+                stored = type(self).objects.using(using).select_for_update().get(pk=self.pk)
+            effective = self
+            if stored is not None and update_fields is not None:
+                effective = stored
                 for field in self._meta.concrete_fields:
-                    if {field.name, field.attname} & kwargs["update_fields"]:
-                        setattr(stored, field.attname, getattr(self, field.attname))
-                stored.full_clean()
-        return super().save(*args, **kwargs)
+                    if {field.name, field.attname} & update_fields:
+                        setattr(effective, field.attname, getattr(self, field.attname))
+            effective.full_clean()
+            self.price_per_square_meter = effective.price_per_square_meter
+            if update_fields is not None:
+                kwargs["update_fields"] = update_fields | {"price_per_square_meter"}
+            return super().save(*args, **kwargs)
 
     def __str__(self):
         return self.code

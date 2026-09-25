@@ -10,7 +10,7 @@ from .models import PropertyFile, PropertyFileImage
 class PropertyFileWriteSerializer(StrictInputSerializer, serializers.ModelSerializer):
     assigned_to = serializers.UUIDField(required=False, label=_("مشاور مسئول"))
     city = serializers.UUIDField(label=_("شهر"))
-    region = serializers.UUIDField(required=False, allow_null=True, label=_("منطقه"))
+    region = serializers.UUIDField( label=_("منطقه"))
     valuable_reasons = serializers.ListField(child=serializers.CharField(max_length=150), required=False, max_length=100, label=_("دلایل ارزشمندی"))
 
     class Meta:

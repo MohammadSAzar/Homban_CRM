@@ -183,8 +183,8 @@ requiredness or block the existing operational APIs in this focused change.
 ## Records
 Future crawler/API/voice-AI ingestion may use incomplete Draft/Staging records.
 Canonical PropertyFile/Customer records will require complete operational data before
-promotion. This is a future boundary only: no Draft/Staging implementation or change
-to current canonical requiredness is included here.
+promotion. No Draft/Staging implementation is included. PropertyFile canonical
+completeness is enforced below; Customer requiredness is unchanged.
 
 ### File
 `apps.properties.PropertyFile` is the core stored CRM record, with an operational REST API.
@@ -192,9 +192,11 @@ It has a UUID, immutable workspace, required same-workspace consultant assignee,
 server-generated code, transaction type (`sale`/`rent`), status, and timezone-aware
 created/updated timestamps. Range membership is not required.
 
-City is required; Region remains optional with custom/divar or incomplete setup
-(NULL); this change does not alter PropertyFile requiredness. Both must belong to the file's workspace, and Region.city must equal the
-file's City. Inactive related records may remain linked for historical continuity.
+City and exactly one Region are required, even while Workspace setup is incomplete.
+Both, and the Region's City, must belong to the file's Workspace; Region.city must
+match the selected City. New Region selection requires an active Region. An existing
+link may remain after its Region becomes inactive; changing Region requires an active
+replacement. No new City-active-state rule is introduced.
 A Region with linked files cannot move to a City inconsistent with those files.
 Address and description are explicit text fields. Owner name, owner phone, and
 visit-contact phone are separate fields; contact data is sensitive and must receive
@@ -202,16 +204,27 @@ field-level authorization in future APIs.
 
 Structured characteristics are area (decimal square metres), bedrooms, total_floors,
 units_per_floor, unit_floor, building_age, parking, storage, elevator, and balcony.
-Unknown numbers are NULL; zero is accepted, including ground floor and new buildings.
+Area is required and strictly positive; bedrooms is required and may be zero. Other
+optional numbers may be NULL; zero is accepted for ground floor and new buildings.
 Negative numbers are rejected (basement numbering is not introduced in this stage).
 Facilities are nullable booleans: NULL means unknown, False explicitly absent.
 No floor-count interpretation or additional upper business bounds are inferred.
 
 All four monetary fields use Decimal values in **Iranian تومان**, with two decimal
-places, never floats or rials. Sale files may store price_per_square_meter and
-total_price; deposit_amount and monthly_rent must be NULL. Rent files use deposit_amount
-and monthly_rent; both sale amounts must be NULL. Unknown applicable amounts are NULL;
-zero is a real amount. No price derivation or deposit/rent conversion occurs.
+places, never floats or rials. Sale total_price is required and nonnegative; rent
+amounts must be NULL. Rent deposit_amount and monthly_rent are both required and
+nonnegative (zero is valid); total_price and price_per_square_meter must be NULL.
+No deposit/rent conversion occurs.
+
+For sale, price_per_square_meter is stored but system-derived:
+`floor((total_price / area) / 1_000_000) * 1_000_000` تومان. Thus 152,778,623
+becomes 152,000,000, not 153,000,000. Exact Decimal integer ratios avoid floating point
+and intermediate division rounding. Model validation derives it; normal saves run in
+an atomic block and lock an existing row. Partial saves validate the resulting stored
+row and always persist its recomputed derived price, ignoring excluded in-memory
+changes. Rent saves clear the derived value. API create/PATCH rejects this field.
+Type changes must explicitly clear incompatible amounts and supply all target-type
+amounts; missing values are never invented. Invalid aggregate changes roll back.
 
 Source is an extensible technical choice field, currently `manual` only. Future
 choices may include Divar, Amlak Plus, Kashano, Peyvand, colleague, previous contact,
@@ -242,12 +255,14 @@ CASCADE only if a file is deliberately deleted through privileged maintenance OR
 no hard-delete service or customer workflow is provided.
 
 Model saves call full_clean for workspace/assignee/location and field validation.
-Database CHECKs enforce nonnegative numbers, sale/rent field separation, valid status,
+NOT NULL fields and CHECKs enforce required core data, positive area, nonnegative
+amounts, required sale/rent financials and their separation, valid status,
 and nonempty code. The code and per-file reason uniqueness also have database guards.
 The atomic creation service saves a file and its children together, using the existing
 Workspace lock order. It is an internal domain operation, not an authorization API.
 Bulk updates/raw SQL bypass cross-table model validation and are unsupported for
-relationship mutation. Existing User/City workspace changes must not be made through
+relationship mutation or derived-price maintenance. Derived equality is an application
+invariant, not a database-generated column. Existing User/City workspace changes must not be made through
 unvalidated maintenance writes; cross-table invariants are not SQL CHECK constraints.
 PropertyFile partial saves also validate the resulting stored row: an unsaved City
 change cannot conceal an incompatible Region-only update (or the reverse).
@@ -265,9 +280,9 @@ first-class CRM data regardless of future Matching use. Matching remains future 
 PATCH only. Actor scope is documented in PERMISSIONS; this API does not expose files
 outside management/assignment scope for Matching. PATCH supports profile/property data,
 sale/rent values and existing statuses, with no Deal-driven transitions. Workspace,
-UUID/code, timestamps and source cannot be written. Applicable fields may be cleared
+UUID/code, timestamps, source and price_per_square_meter cannot be written. Applicable fields may be cleared
 with null when switching sale/rent type. Existing domain rules remain authoritative;
-inactive same-workspace City/Region references remain permitted for historical use.
+existing inactive Region links may remain, but newly selected Regions must be active.
 
 `valuable_reasons` is an optional array of individual labels on create/PATCH. Supplying
 it replaces the entire set atomically; [] clears it. Omission preserves existing reasons.

@@ -52,6 +52,7 @@ def world():
     foreign_region = Region.objects.create(workspace=foreign_workspace, city=foreign_city, name="ونک")
     def file(assignee, ws=workspace, location=city):
         return create_property_file(workspace=ws, assigned_to=assignee, city=location,
+            region=region if ws == workspace else foreign_region, area=100, bedrooms=0, total_price=1000,
             transaction_type="sale", owner_name="نام محرمانه", owner_phone="09121111111",
             visit_contact_phone="09122222222", description="یادداشت محرمانه", address="نشانی محرمانه",
             valuable_reasons=["قیمت مناسب"], image_references=["private/image"])
@@ -63,7 +64,7 @@ def world():
 
 
 def body(world, **changes):
-    return {"transaction_type": "sale", "city": str(world.city.pk), **changes}
+    return {"transaction_type": "sale", "city": str(world.city.pk), "region": str(world.region.pk), "area": "100", "bedrooms": 0, "total_price": 1000, **changes}
 
 
 @pytest.mark.parametrize("actor", ["agency", "manager", "consultant"])
@@ -181,7 +182,7 @@ def test_owner_does_not_expand_scope(world, actor):
 
 @pytest.mark.parametrize("field,value", [
     ("workspace", "fake"), ("workspace_id", "fake"), ("code", "fake"), ("id", "fake"),
-    ("created_at", "2020-01-01"), ("updated_at", "2020-01-01"), ("source", "divar"),
+    ("created_at", "2020-01-01"), ("updated_at", "2020-01-01"), ("source", "divar"), ("price_per_square_meter", 0),
     ("is_superuser", True), ("images", []), ("assigned_to_id", "fake"),
 ])
 def test_immutable_and_extra_payload_rejected(world, field, value):
@@ -203,7 +204,7 @@ def test_domain_validation(world, changes):
 
 def test_rent_and_transaction_change(world):
     client = client_for(world.consultant)
-    response = client.post(BASE, body(world, transaction_type="rent", deposit_amount="100.50", monthly_rent="25.25"), format="json")
+    response = client.post(BASE, body(world, transaction_type="rent", total_price=None, deposit_amount="100.50", monthly_rent="25.25"), format="json")
     assert response.status_code == 201, response.data
     endpoint = BASE + response.data["id"] + "/"
     assert client.patch(endpoint, {"total_price": 5}, format="json").status_code == 400
@@ -285,6 +286,9 @@ def test_filters(world, filters):
     world.own.is_valuable = True
     world.own.save()
     world.managed.transaction_type = "rent"
+    world.managed.total_price = None
+    world.managed.deposit_amount = 0
+    world.managed.monthly_rent = 0
     world.managed.area = 200 if "max_area" in filters else 50
     world.managed.save()
     response = client_for(world.manager).get(BASE, filters)
@@ -296,10 +300,10 @@ def test_filters(world, filters):
 
 
 def test_uuid_filters_and_invalid_filters(world):
-    world.own.region = world.region
+    world.own.region = Region.objects.create(workspace=world.workspace, city=world.city, name="ویژه")
     world.own.save()
     client = client_for(world.agency)
-    for field, target in (("assigned_to", world.consultant), ("region", world.region)):
+    for field, target in (("assigned_to", world.consultant), ("region", world.own.region)):
         assert client.get(BASE, {field: str(target.pk)}).data["count"] == 1
     assert client.get(BASE, {"city": str(world.city.pk)}).data["count"] == 3
     assert client.get(BASE, {"assigned_to": str(world.foreign_user.pk)}).data["count"] == 0
@@ -320,7 +324,7 @@ def test_list_detail_queries_do_not_grow(world, actor):
         assert response.status_code == 200
         assert len(queries) == 4
         create_property_file(workspace=world.workspace, assigned_to=world.consultant, city=world.city,
-            transaction_type="sale", image_references=["a", "b"], valuable_reasons=["الف", "ب"])
+            transaction_type="sale", region=world.region, area=100, bedrooms=0, total_price=1000, image_references=["a", "b"], valuable_reasons=["الف", "ب"])
         PropertyFileImage.objects.create(property_file=world.own, reference="extra")
 
 
@@ -377,7 +381,7 @@ def test_create_rollback_on_invalid_reasons(world):
 
 def test_list_pagination(world):
     for _ in range(50):
-        PropertyFile.objects.create(workspace=world.workspace, assigned_to=world.consultant, city=world.city, transaction_type="sale")
+        PropertyFile.objects.create(workspace=world.workspace, assigned_to=world.consultant, city=world.city, region=world.region, area=100, bedrooms=0, total_price=1000, transaction_type="sale")
     client = client_for(world.consultant)
     first = client.get(BASE).data
     second = client.get(BASE, {"page": 2}).data

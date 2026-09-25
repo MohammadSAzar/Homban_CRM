@@ -17,7 +17,7 @@ WRITE_FIELDS = (
     "assigned_to", "transaction_type", "status", "city", "region", "address",
     "owner_name", "owner_phone", "visit_contact_phone", "area", "bedrooms",
     "total_floors", "units_per_floor", "unit_floor", "building_age", "parking",
-    "storage", "elevator", "balcony", "price_per_square_meter", "total_price",
+    "storage", "elevator", "balcony", "total_price",
     "deposit_amount", "monthly_rent", "description", "is_valuable", "valuable_reasons",
 )
 

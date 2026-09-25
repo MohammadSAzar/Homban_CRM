@@ -155,7 +155,7 @@ assignment hook. Broader workspace immutability and bulk-write policies remain u
 
 ## PropertyFile domain foundation
 `properties` adds PropertyFile, PropertyFileImage and PropertyFileValuableReason.
-Files include assignment, optional Region/required City, address, separate owner/visit
+Files include assignment, required Region/City, positive area and required bedrooms, address, separate owner/visit
 contacts, description, structured characteristics and nullable facilities, sale/rent
 Decimal prices in تومان, status, source, valuable flag, code and aware timestamps.
 Images are ordered opaque references; each valuable reason has its own child row.
@@ -169,6 +169,31 @@ An atomic internal service creates files and children together. New migration
 `properties/0001_initial.py` creates only the new models, indexes and constraints;
 old migrations are unchanged. No PropertyFile Matching, frontend, media storage,
 imports or crawlers are implemented. See DOMAIN for defaults and integrity boundaries.
+
+### Canonical PropertyFile completeness
+Region, positive area and nonnegative bedrooms are required. Sale requires total_price;
+rent requires deposit_amount and monthly_rent (zero allowed). Incompatible amounts
+must be NULL. Stored sale price_per_square_meter is system-derived by flooring the
+exact total_price/area ratio to whole millions of تومان, and is read-only to clients.
+Normal full/partial model saves recompute from the resulting stored fields; rent clears
+it. Newly selected Regions must be active; retained inactive links remain valid.
+No permissions, read query shapes, Customer requiredness or Workspace policy changed.
+
+Migration properties/0002_canonical_completeness validates all existing rows before
+DDL, stops with category counts on incomplete/inconsistent data, and deterministically
+backfills valid sale prices before enforcing NOT NULL/CHECK constraints. It fabricates
+no business values and leaves old migrations unchanged. The development database on
+2026-09-24 has no properties tables: properties/0001_initial is unapplied. Therefore
+there are no existing PropertyFile rows to repair; development migrations remain
+unapplied. Test migrations cover legacy valid/incomplete rows and deterministic reruns.
+Incomplete future ingestion belongs in a future Draft/Staging layer, not canonical
+PropertyFiles. No ingestion, Draft/Staging or Matching was implemented.
+
+Verification: 189 focused PropertyFile cases passed across development runs, including
+27 new completeness/migration cases. The full regression passed 740 tests with 99%
+apps/common statement coverage. Django check and migration drift check pass. Existing
+list/detail query-count assertions remain at 3/4 queries respectively. Schema changes
+were exercised in the test database, not applied to development.
 
 ## Customer domain foundation
 Customer, CustomerRegionPreference and CustomerValuableReason are implemented in

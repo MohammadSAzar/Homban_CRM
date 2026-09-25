@@ -17,6 +17,16 @@ from apps.properties.services import create_property_file
 pytestmark = pytest.mark.django_db
 
 
+def make_file(*, aggregate=False, **fields):
+    defaults = dict(area=Decimal("100"), bedrooms=0)
+    if fields.get("transaction_type") == "rent":
+        defaults.update(total_price=None, deposit_amount=0, monthly_rent=0)
+    else:
+        defaults["total_price"] = Decimal("10000000000")
+    data = {**defaults, **fields}
+    return create_property_file(**data) if aggregate else PropertyFile.objects.create(**data)
+
+
 @pytest.fixture
 def context():
     workspace = Workspace.objects.create(name="تهران", slug="property-test", customer_type="consultant")
@@ -36,12 +46,12 @@ def foreign():
 
 
 @pytest.mark.parametrize("kind,amounts", [
-    ("sale", {"price_per_square_meter": Decimal("125000000.25"), "total_price": Decimal("12500000025.00")}),
+    ("sale", {"total_price": Decimal("12500000025.00")}),
     ("rent", {"deposit_amount": Decimal("500000000.00"), "monthly_rent": Decimal("15000000.50")}),
 ])
 def test_valid_file_round_trip(context, kind, amounts):
     context["transaction_type"] = kind
-    item = create_property_file(**context, **amounts, area=Decimal("100.00"),
+    item = make_file(aggregate=True, **context, **amounts, area=Decimal("100.00"),
         bedrooms=2, total_floors=5, units_per_floor=2, unit_floor=0, building_age=0,
         owner_name="مالک", owner_phone="09121111111", visit_contact_phone="09122222222",
         address="نشانی ملک", description="توضیحات مستقل فایل")
@@ -64,22 +74,20 @@ def test_valid_file_round_trip(context, kind, amounts):
 
 
 @pytest.mark.parametrize("mode", [None, "custom", "divar"])
-def test_region_optional_in_every_mode(context, mode):
+def test_region_required_in_every_mode(context, mode):
     workspace = context["workspace"]
     workspace.region_mode = mode
     workspace.save()
     context["region"] = None
-    item = PropertyFile.objects.create(**context)
-    assert item.region is None
-    assert item.area is None
-    assert item.total_price is None
+    with pytest.raises(ValidationError):
+        make_file(**context)
 
 
 @pytest.mark.parametrize("field", ["assigned_to", "city", "region"])
 def test_foreign_relationship_rejected(context, foreign, field):
     context[field] = foreign[field]
     with pytest.raises(ValidationError) as error:
-        PropertyFile.objects.create(**context)
+        make_file(**context)
     assert field in error.value.message_dict
     assert not PropertyFile.objects.exists()
 
@@ -87,7 +95,7 @@ def test_foreign_relationship_rejected(context, foreign, field):
 def test_city_region_mismatch(context):
     context["city"] = City.objects.create(workspace=context["workspace"], name="ری")
     with pytest.raises(ValidationError, match="منطقه"):
-        PropertyFile.objects.create(**context)
+        make_file(**context)
 
 
 @pytest.mark.parametrize("role", ["agency_manager", "range_manager", "secretary", "admin"])
@@ -96,7 +104,7 @@ def test_consultant_required(context, role):
     user.role = role
     user.save()
     with pytest.raises(ValidationError, match="مشاور"):
-        PropertyFile.objects.create(**context)
+        make_file(**context)
 
 
 def test_workspace_less_assignee_rejected(context):
@@ -104,7 +112,7 @@ def test_workspace_less_assignee_rejected(context):
     user.workspace = None
     user.save()
     with pytest.raises(ValidationError):
-        PropertyFile.objects.create(**context)
+        make_file(**context)
 
 
 @pytest.mark.parametrize("field", ["assigned_to", "city", "region"])
@@ -112,27 +120,27 @@ def test_missing_relationship_raises_validation_not_does_not_exist(context, fiel
     context.pop(field)
     context[f"{field}_id"] = uuid.uuid4()
     with pytest.raises(ValidationError):
-        PropertyFile.objects.create(**context)
+        make_file(**context)
 
 
-@pytest.mark.parametrize("kind,field", [("sale", "deposit_amount"), ("sale", "monthly_rent"), ("rent", "total_price"), ("rent", "price_per_square_meter")])
+@pytest.mark.parametrize("kind,field", [("sale", "deposit_amount"), ("sale", "monthly_rent"), ("rent", "total_price")])
 @pytest.mark.parametrize("amount", [Decimal("0"), Decimal("1.50")])
 def test_incompatible_financial_fields(context, kind, field, amount):
     context["transaction_type"] = kind
     with pytest.raises(ValidationError) as error:
-        PropertyFile.objects.create(**context, **{field: amount})
+        make_file(**context, **{field: amount})
     assert field in error.value.message_dict
 
 
 NUMERIC_FIELDS = ["area", "bedrooms", "total_floors", "units_per_floor", "unit_floor", "building_age", "price_per_square_meter", "total_price", "deposit_amount", "monthly_rent"]
 
 
-@pytest.mark.parametrize("field", NUMERIC_FIELDS)
+@pytest.mark.parametrize("field", [field for field in NUMERIC_FIELDS if field != "price_per_square_meter"])
 def test_negative_values_rejected(context, field):
     if field in ("deposit_amount", "monthly_rent"):
         context["transaction_type"] = "rent"
     with pytest.raises(ValidationError) as error:
-        PropertyFile.objects.create(**context, **{field: -1})
+        make_file(**context, **{field: -1})
     assert field in error.value.message_dict
 
 
@@ -140,7 +148,7 @@ def test_negative_values_rejected(context, field):
 def test_database_rejects_negative_even_when_validation_bypassed(context, field):
     if field in ("deposit_amount", "monthly_rent"):
         context["transaction_type"] = "rent"
-    item = PropertyFile.objects.create(**context)
+    item = make_file(**context)
     # MySQL unsigned integer columns reject negatives before CHECK evaluation.
     with pytest.raises((IntegrityError, DataError)), transaction.atomic():
         PropertyFile.objects.filter(pk=item.pk).update(**{field: -1})
@@ -153,7 +161,7 @@ def test_database_rejects_negative_even_when_validation_bypassed(context, field)
     {"status": "invalid"}, {"code": ""},
 ])
 def test_database_choices_and_financial_constraints(context, changes):
-    item = PropertyFile.objects.create(**context)
+    item = make_file(**context)
     with pytest.raises(IntegrityError), transaction.atomic():
         PropertyFile.objects.filter(pk=item.pk).update(**changes)
 
@@ -161,14 +169,14 @@ def test_database_choices_and_financial_constraints(context, changes):
 @pytest.mark.parametrize("value", [True, False, None])
 def test_facilities_preserve_unknown_and_false(context, value):
     fields = dict.fromkeys(["parking", "storage", "elevator", "balcony"], value)
-    item = PropertyFile.objects.create(**context, **fields)
+    item = make_file(**context, **fields)
     item.refresh_from_db()
     assert all(getattr(item, field) is value for field in fields)
 
 
 @pytest.mark.parametrize("status", PropertyFile.Status.values)
 def test_status_persists_without_deletion(context, status):
-    item = create_property_file(**context, image_references=["media/reference"], valuable_reasons=["قیمت مناسب"])
+    item = make_file(aggregate=True, **context, image_references=["media/reference"], valuable_reasons=["قیمت مناسب"])
     item.status = status
     item.save()
     item.refresh_from_db()
@@ -179,7 +187,7 @@ def test_status_persists_without_deletion(context, status):
 
 
 def test_multiple_reasons_and_ordered_images(context):
-    item = create_property_file(**context, is_valuable=True,
+    item = make_file(aggregate=True, **context, is_valuable=True,
         valuable_reasons=["قیمت مناسب", "موقعیت مناسب"],
         image_references=["https://example.com/front.jpg", "media/interior.jpg"])
     assert set(item.valuable_reasons.values_list("reason", flat=True)) == {"قیمت مناسب", "موقعیت مناسب"}
@@ -197,7 +205,7 @@ def test_multiple_reasons_and_ordered_images(context):
 
 
 def test_valuable_without_reasons_is_supported(context):
-    item = PropertyFile.objects.create(**context, is_valuable=True)
+    item = make_file(**context, is_valuable=True)
     assert item.valuable_reasons.count() == 0
 
 
@@ -207,14 +215,14 @@ def test_valuable_without_reasons_is_supported(context):
 ])
 def test_aggregate_creation_rollback(context, kwargs):
     with pytest.raises(ValidationError):
-        create_property_file(**context, **kwargs)
+        make_file(aggregate=True, **context, **kwargs)
     assert not PropertyFile.objects.exists()
     assert not PropertyFileImage.objects.exists()
     assert not PropertyFileValuableReason.objects.exists()
 
 
 def test_image_order_validation_and_database(context):
-    item = PropertyFile.objects.create(**context)
+    item = make_file(**context)
     with pytest.raises(ValidationError):
         PropertyFileImage.objects.create(property_file=item, reference="media/image", sort_order=-1)
     image = PropertyFileImage.objects.create(property_file=item, reference="media/image")
@@ -223,7 +231,7 @@ def test_image_order_validation_and_database(context):
 
 
 def test_referenced_region_cannot_move_to_another_city(context):
-    item = PropertyFile.objects.create(**context)
+    item = make_file(**context)
     region = context["region"]
     region.city = City.objects.create(workspace=context["workspace"], name="ری")
     with pytest.raises(ValidationError):
@@ -233,8 +241,8 @@ def test_referenced_region_cannot_move_to_another_city(context):
 
 
 def test_codes_are_unique_stable_server_derived(context):
-    first = PropertyFile.objects.create(**context)
-    second = PropertyFile.objects.create(**context)
+    first = make_file(**context)
+    second = make_file(**context)
     assert first.code != second.code
     assert first.code == f"PF-{first.pk.hex.upper()}"
     code = first.code
@@ -249,11 +257,11 @@ def test_codes_are_unique_stable_server_derived(context):
     with pytest.raises(IntegrityError), transaction.atomic():
         PropertyFile.objects.filter(pk=first.pk).update(code=second.code)
     with pytest.raises(ValidationError):
-        PropertyFile.objects.create(**context, code="client-code")
+        make_file(**context, code="client-code")
 
 
 def test_workspace_cannot_be_changed(context, foreign):
-    item = PropertyFile.objects.create(**context)
+    item = make_file(**context)
     for name, value in foreign.items():
         setattr(item, name, value)
     with pytest.raises(ValidationError) as error:
@@ -265,7 +273,7 @@ def test_workspace_cannot_be_changed(context, foreign):
 
 @pytest.mark.parametrize("field", ["workspace", "assigned_to", "city", "region"])
 def test_related_business_records_are_protected(context, field):
-    item = create_property_file(**context, image_references=["image"], valuable_reasons=["موقعیت"])
+    item = make_file(aggregate=True, **context, image_references=["image"], valuable_reasons=["موقعیت"])
     with pytest.raises(ProtectedError):
         context[field].delete()
     assert PropertyFile.objects.filter(pk=item.pk).exists()
@@ -274,7 +282,7 @@ def test_related_business_records_are_protected(context, field):
 
 
 def test_transaction_change_requires_clearing_previous_amounts(context):
-    item = PropertyFile.objects.create(**context, total_price=100)
+    item = make_file(**context, total_price=100)
     item.transaction_type = "rent"
     with pytest.raises(ValidationError):
         item.save()
@@ -290,7 +298,7 @@ def test_transaction_change_requires_clearing_previous_amounts(context):
 
 @pytest.mark.parametrize("field", ["region", "region_id", "city", "city_id"])
 def test_partial_location_save_validates_the_stored_city(context, field):
-    item = PropertyFile.objects.create(**context)
+    item = make_file(**context)
     city = City.objects.create(workspace=context["workspace"], name="ری")
     region = Region.objects.create(workspace=context["workspace"], city=city, name="مرکز")
     item.city, item.region = city, region
