@@ -300,3 +300,15 @@ Candidate abstractions:
 - Range scope service
 
 Do not prematurely build a highly generic permission framework before real use-cases exist.
+
+### MatchingProfile settings
+All active authenticated customer users in an active Workspace may GET/PATCH/reset
+only their own base MatchingProfile, including agency managers, range managers,
+consultants, secretaries and admins. No additional operational role restriction applies.
+Workspace-less internal users are denied; owner/staff/superuser flags grant no bypass
+or access to another profile. No profile-owner route or collection is exposed.
+Ownership/workspace/timestamps and unknown fields are rejected in payloads; query
+parameters cannot select another owner. Services recheck current database membership
+and active state while holding Workspace/User locks. Settings disclose no other
+user's data and do not change PropertyFile/Customer operational permissions.
+Future restricted Matching candidate visibility remains separate and unimplemented.

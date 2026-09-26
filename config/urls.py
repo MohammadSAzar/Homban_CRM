@@ -25,6 +25,7 @@ urlpatterns = [
     path('api/v1/', include('apps.ranges.urls')),
     path('api/v1/', include('apps.properties.urls')),
     path('api/v1/', include('apps.customers.urls')),
+    path('api/v1/', include('apps.matching.urls')),
     path('api/v1/users/', UserListCreateView.as_view(), name='user-list'),
     path('api/v1/users/<uuid:pk>/', UserDetailView.as_view(), name='user-detail'),
 ]

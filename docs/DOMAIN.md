@@ -414,6 +414,41 @@ Assignment affects:
 - Future commission attribution
 
 ## Matching
+### Persisted base MatchingProfile
+`apps.matching.MatchingProfile` stores each user's base/default configuration,
+with a UUID, OneToOne user ownership and timezone-aware timestamps. Workspace is
+inherited through the user, never duplicated on the profile. The profile is lazily
+created on first authenticated GET/use; Workspace -> User -> Profile locks serialize
+creation, PATCH and reset, and the database enforces one profile per user. Personal
+settings use CASCADE on user deletion; they are not CRM history records.
+
+Persisted defaults (relative weights, not percentages):
+- area = 25, bedrooms = 15, building_age = 10, region = 10
+- parking = 4, elevator = 3, storage = 2, balcony = 1
+- minimum_score = 50 (allowed range 0–100)
+- sale_budget_lower_ratio = 0.80; sale_budget_upper_ratio = 1.20
+- rent_per_100m_deposit = 3,000,000 تومان
+
+Weights are nonnegative Decimals with two decimal places; at least one must be
+positive. They need not total 100 and are never normalized by settings storage.
+Budget is an eligibility gate, not a weighted criterion: there is no budget weight.
+Sale gate ratios use four decimal places, with 0 < lower <= 1 <= upper and
+lower <= upper. Rent conversion must be positive: the fixed v1 base is 100,000,000
+تومان deposit, equivalent by default to 3,000,000 تومان monthly rent. Only the
+monthly-rent equivalent is configurable. No conversion or gate is calculated here.
+
+`GET/PATCH /api/v1/matching-profile/` reads/updates only the authenticated user's
+settings. `POST /api/v1/matching-profile/reset/` accepts an empty object and restores
+all defaults atomically, preserving profile identity. Responses expose only settings,
+not owner/workspace/security fields. PATCH validates the complete resulting profile.
+There is no collection, owner-ID route or DELETE endpoint.
+
+Temporary detail-page sliders and «خط قرمز» hard constraints are runtime-only future
+options, not persisted fields. A future pure Matching Engine will consume profiles,
+PropertyFiles, Customers and optional runtime inputs. This feature performs no pair
+scoring, candidate search, recommendation generation or calculation/result persistence.
+
+### Future Matching Engine and results
 A Match connects one File and one Customer with:
 - Compatibility score
 - Explanation/reasons

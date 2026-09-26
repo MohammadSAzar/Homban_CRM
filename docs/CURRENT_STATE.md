@@ -518,3 +518,20 @@ Treat these as future work unless repository inspection proves otherwise:
 Before implementing new work, inspect the repository.
 
 This document may lag behind code; the repository is authoritative for implementation state, while product/domain docs are authoritative for intended product behavior.
+
+## MatchingProfile foundation
+`apps/matching` now contains persisted per-user base settings with migration
+`matching/0001_initial.py`. UUID/timestamps and OneToOne ownership have no duplicated
+Workspace field. Authenticated customer users of every current role manage only their
+own settings through GET/PATCH `/api/v1/matching-profile/` and empty POST
+`/api/v1/matching-profile/reset/`. Creation is lazy and serialized using existing
+Workspace -> User locking; reset is atomic. No list, owner-ID route or DELETE exists.
+Defaults: area 25, bedrooms 15, building_age 10, region 10, parking 4, elevator 3,
+storage 2, balcony 1; minimum_score 50; sale budget gate 0.80–1.20; monthly-rent
+conversion 3,000,000 تومان per fixed 100,000,000 تومان deposit. Weights and money
+use Decimal; weights need not sum to 100, but at least one must be positive.
+Model/API validation and database checks enforce weight, score, ratio and conversion
+invariants. Budget has no weight. Only settings fields are returned/writable.
+No scoring, candidate search, hard constraints, temporary overrides, Match/results,
+notifications, Tasks, ingestion or frontend were implemented. Production deployment
+remains future work; the new migration is an explicit deployment step.
