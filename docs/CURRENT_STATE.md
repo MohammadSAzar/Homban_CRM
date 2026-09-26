@@ -502,7 +502,7 @@ foundation uses Django's environment-backed secret as SimpleJWT's default signin
 ## Not yet implemented / not confirmed as implemented
 Treat these as future work unless repository inspection proves otherwise:
 - Full permission framework
-- Matching engine
+- Candidate-search/live Matching APIs and recommendation persistence
 - Pass/collaboration workflow
 - Task/calendar
 - Chat
@@ -535,3 +535,23 @@ invariants. Budget has no weight. Only settings fields are returned/writable.
 No scoring, candidate search, hard constraints, temporary overrides, Match/results,
 notifications, Tasks, ingestion or frontend were implemented. Production deployment
 remains future work; the new migration is an explicit deployment step.
+
+## Pure Matching Engine v1
+`apps/matching/engine.py` implements deterministic single-pair evaluation with formula
+identifier `matching-v1`; Persian messages are separate in `explanations.py`.
+Workspace/type/active-status/budget gates precede the approved area, bedrooms, age,
+Region and file-facility curves. Budget is never weighted. Rent uses the fixed 100M
+base and profile rate, with exact scaled gate comparisons. Applicable-weight
+normalization precedes the 10% explicit non-preferred Region penalty and inclusive
+minimum-score threshold. See DOMAIN for the exact curves and approved zero-area /
+inactive-all-Regions edge cases. Zero applicable weight returns eligible but unscorable.
+Frozen results carry structured explanations and no contact data. The evaluator is
+non-persistent and does not mutate inputs; loaded relations yield zero queries,
+otherwise at most two bounded reads. No endpoints or model/schema changes were added.
+Runtime sliders, hard constraints, candidate search/live Matching APIs and persisted
+recommendations remain unimplemented.
+
+Verification: 84 focused engine cases passed; the full regression/coverage run passed
+893 tests with 99% overall coverage and 100% engine/explanation statement coverage.
+Django checks, migration-drift checks and diff checks passed. Query tests verify zero
+reads with loaded relations, at most two otherwise, and no writes or input mutation.

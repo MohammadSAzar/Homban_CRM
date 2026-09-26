@@ -443,12 +443,68 @@ all defaults atomically, preserving profile identity. Responses expose only sett
 not owner/workspace/security fields. PATCH validates the complete resulting profile.
 There is no collection, owner-ID route or DELETE endpoint.
 
-Temporary detail-page sliders and «خط قرمز» hard constraints are runtime-only future
-options, not persisted fields. A future pure Matching Engine will consume profiles,
-PropertyFiles, Customers and optional runtime inputs. This feature performs no pair
-scoring, candidate search, recommendation generation or calculation/result persistence.
+Temporary detail-page sliders and «خط قرمز» hard constraints remain future runtime
+options, not persisted fields. The profile does not persist calculations/results.
 
-### Future Matching Engine and results
+### Pure Matching Engine v1
+`apps.matching.engine.evaluate_match(property_file, customer, profile)` evaluates
+exactly one canonical pair; direction does not change logic. It returns frozen
+MatchingResult/BudgetGate/CriterionResult/RegionPenalty value objects, identified by
+`matching-v1`. It never creates profiles, mutates source objects or writes results.
+Authorization and candidate visibility belong to future callers, not this evaluator.
+
+Eligibility is checked before scoring: equal Workspace IDs, buyer/sale or tenant/rent,
+`active` status on both records, and an inclusive budget gate. Other existing statuses
+are rejected. Foreign file Region relationships fail closed. Rejection gives
+eligible=False, recommended=False, no score, and an English code/Persian explanation.
+
+Sale gate: customer budget × profile lower/upper ratios bounds file total_price.
+Rent equivalent: deposit + monthly_rent × 100,000,000 / rent_per_100m_deposit,
+for both sides; apply the same profile ratios to customer equivalent. Budget earns
+no scoring points. Zero amounts are allowed. Gate comparison uses amounts scaled
+by the common conversion rate before division, preserving exact inclusive boundaries
+even when equivalent deposits repeat as decimals.
+
+Scoring (W is the corresponding profile weight):
+- Area inside [min_area,max_area]: W. Outside, distance from the nearest boundary
+  divided by that boundary gives percentage deviation. <=5%, <=10%, <=15%, <=20%,
+  <=25%, >25% earn respectively .88W, .76W, .56W, .32W, .16W, 0.
+  Approved zero-bound edge case: max_area=0 with positive file area earns 0;
+  percentage deviation is undefined (None), never division by zero.
+- Bedrooms: exact earns W, one-room absolute difference earns 8W/15, >=2 earns 0.
+- Age: no requested bound excludes the criterion entirely. A one-sided bound leaves
+  the other side unrestricted. Requested but unknown file age earns 0. Inside earns
+  W; outside the nearest bound by <=2, <=5, <=10, >10 years earns .80W, .50W, .20W, 0.
+- Explicit preferred Region earns W, including retained inactive historical links.
+  Non-preferred earns 0. all_regions=True earns W only for an active Region in this
+  Workspace. Approved historical edge case: inactive Region earns 0 under all_regions,
+  remains eligible, and receives no region penalty.
+- Parking/elevator/storage/balcony are file-quality bonuses, always applicable:
+  True earns W; False or NULL earns 0. No Customer facility preferences are inferred.
+
+Normalized score = earned applicable points / available applicable weight × 100.
+Zero weights add nothing. If applicable weight is zero, eligible remains True but
+recommended=False, both scores are None, and reason_code is `no_applicable_weight`.
+For explicit non-preferred Regions only, final score is normalized score × .90;
+otherwise it is unchanged. Final score is clamped to [0,100]. Recommendation uses
+final score >= minimum_score inclusively; below threshold remains eligible.
+Arithmetic uses a fixed 50-significant-digit Decimal context, independent of the
+caller, without display rounding or quantization. Bucket comparisons avoid early
+division rounding. Persian messages live separately in `explanations.py`.
+
+Results expose eligibility/recommendation, scores/threshold, version, technical codes,
+Persian explanations, per-criterion applicability/weight/earned/reference values,
+budget amounts/range/conversion, point totals and region penalty. No contacts,
+addresses, notes, image references or source model instances are returned.
+Load scalar fields normally and use select_related("region") on PropertyFile plus
+prefetch_related("preferred_regions") on Customer for zero-query evaluation. Otherwise
+there is at most one file Region read and one preference existence read; all_regions
+skips the preference read. The evaluator does not populate input relation caches.
+
+No runtime slider overrides, «خط قرمز», candidate-search/live APIs, persisted Match
+or recommendation results, notifications or collaboration workflow are implemented.
+
+### Future persisted results
 A Match connects one File and one Customer with:
 - Compatibility score
 - Explanation/reasons
