@@ -293,7 +293,7 @@ Customer endpoints:
 
 Agency managers manage workspace Customers, consultants their own, and range managers
 Customers of consultants across all their active managed Ranges. No ownership/staff
-bypass or general cross-owner browsing exists. Future Matching visibility is separate.
+bypass or general cross-owner browsing exists. Live Matching uses separate restricted output.
 Creation/reassignment requires an active scoped consultant; workspace/code/timestamps
 remain server-owned. Contact data is scoped before serialization. Compact lists include
 name; mobile, description, preferred Regions and reasons appear in authorized details.
@@ -502,7 +502,7 @@ foundation uses Django's environment-backed secret as SimpleJWT's default signin
 ## Not yet implemented / not confirmed as implemented
 Treat these as future work unless repository inspection proves otherwise:
 - Full permission framework
-- Candidate-search/live Matching APIs and recommendation persistence
+- Recommendation persistence and bulk/background Matching
 - Pass/collaboration workflow
 - Task/calendar
 - Chat
@@ -548,10 +548,33 @@ inactive-all-Regions edge cases. Zero applicable weight returns eligible but uns
 Frozen results carry structured explanations and no contact data. The evaluator is
 non-persistent and does not mutate inputs; loaded relations yield zero queries,
 otherwise at most two bounded reads. No endpoints or model/schema changes were added.
-Runtime sliders, hard constraints, candidate search/live Matching APIs and persisted
-recommendations remain unimplemented.
+Runtime options and live candidate APIs are implemented separately below; the pure
+engine remains unchanged in scope. Persisted recommendations remain unimplemented.
 
 Verification: 84 focused engine cases passed; the full regression/coverage run passed
 893 tests with 99% overall coverage and 100% engine/explanation statement coverage.
 Django checks, migration-drift checks and diff checks passed. Query tests verify zero
 reads with loaded relations, at most two otherwise, and no writes or input mutation.
+
+## Live Matching v1
+Implemented POST `/api/v1/customers/<uuid>/matches/` and
+`/api/v1/property-files/<uuid>/matches/`. Source authorization reuses the operational
+policies; candidates span consultants/Ranges only within the same Workspace.
+The viewer's base profile plus validated temporary overrides feed the finalized v1
+pair evaluator. Shared eligibility is exposed before runtime exact «خط قرمز» checks;
+scoring formulas and existing pure-engine tests remain unchanged. Area/bedrooms/age/
+Region/facility toggles are request-only. Fixed Customers without age bounds reject
+an age toggle; candidate Customers without age bounds treat it as inapplicable.
+Restricted candidate serializers omit all contacts, Customer names, notes, addresses,
+media, reasons and assignee identity. Results include Decimal-string score/budget/
+criterion explanations, sort by score descending then UUID, and paginate at 50.
+A 1,000-coarse-candidate cap rejects overflow explicitly before evaluation. Joined and
+prefetched Region data keep query counts independent of candidate count. Only lazy
+profile creation can write; no runtime options, business records or results are saved.
+No migration, Match/Recommendation model, notifications, Tasks, pass or frontend added.
+
+Verification: 79 Live Matching tests and 128 unchanged engine/profile regression
+tests passed. The full coverage run passed 972 tests with 99% overall coverage.
+Query-count tests remain constant as candidates increase in both directions; actual
+1,000/1,001-candidate boundary tests verify evaluation and overflow rejection.
+Django, migration-drift and diff checks passed; no schema migration is required.

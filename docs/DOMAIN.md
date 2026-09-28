@@ -443,8 +443,8 @@ all defaults atomically, preserving profile identity. Responses expose only sett
 not owner/workspace/security fields. PATCH validates the complete resulting profile.
 There is no collection, owner-ID route or DELETE endpoint.
 
-Temporary detail-page sliders and «خط قرمز» hard constraints remain future runtime
-options, not persisted fields. The profile does not persist calculations/results.
+Temporary detail-page sliders and «خط قرمز» hard constraints are live request
+options described below, not persisted fields. The profile does not persist results.
 
 ### Pure Matching Engine v1
 `apps.matching.engine.evaluate_match(property_file, customer, profile)` evaluates
@@ -501,8 +501,61 @@ prefetch_related("preferred_regions") on Customer for zero-query evaluation. Oth
 there is at most one file Region read and one preference existence read; all_regions
 skips the preference read. The evaluator does not populate input relation caches.
 
-No runtime slider overrides, «خط قرمز», candidate-search/live APIs, persisted Match
-or recommendation results, notifications or collaboration workflow are implemented.
+The pure evaluator remains free of runtime overrides and hard constraints. Live
+request handling below adds those options without changing v1 formulas. Persisted
+Match/recommendation results, notifications and collaboration remain unimplemented.
+
+### Live Matching v1
+`POST /api/v1/customers/<uuid>/matches/` and
+`POST /api/v1/property-files/<uuid>/matches/` calculate non-persistent matches.
+The source must be in the actor's existing operational scope: agency workspace,
+consultant ownership, or union of a range manager's active managed Ranges. Existing
+secretary/admin denials and 404 behavior remain. Candidates may belong to any
+consultant in the same Workspace, across Range boundaries. Active record status and
+compatible type are coarse filters; inactive assignees do not erase otherwise active
+historical records. Workspace/assignee/location integrity filters fail closed.
+
+The viewer's own MatchingProfile supplies defaults (lazy creation is reused).
+The body accepts only `overrides` and `hard_constraints`, both optional objects.
+Overrides may contain the twelve MatchingProfile setting fields, validated with the
+same field limits and positive-weight invariant. They form an in-memory settings
+object and never update the profile. Unknown keys and non-boolean hard toggles fail.
+An empty body uses base settings with no hard constraints.
+
+«خط قرمز» toggles are exact runtime checks, independent of scoring weights:
+- area: inside the Customer's inclusive min/max bounds, without tolerance.
+- bedrooms: exact equality.
+- building_age: known age within all requested bounds. A fixed Customer source with
+  no age bounds rejects the toggle. In File -> Customers, the toggle is inapplicable
+  for candidate Customers without age bounds; no requirement is invented.
+- region: explicit preferred membership (including retained inactive links), or an
+  active same-Workspace Region for all_regions=True. Failure excludes the pair.
+- parking/elevator/storage/balcony: the selected facility must be True; False/NULL fail.
+
+Order: shared engine eligibility -> exact hard checks -> finalized evaluate_match ->
+existing Region penalty/threshold. Eligibility is exposed for reuse, without changing
+formulas or existing evaluator output. Only recommended, eligible, hard-passing pairs
+are returned; there is no diagnostic mode. Results sort by full-precision final score
+descending, then UUID ascending, never ownership. Both directions reuse the same pair
+logic and score representation. Decimal results are serialized as strings, not floats.
+
+Each row contains a restricted `candidate` plus the engine result: scores, version,
+threshold, budget summary, criterion/reference explanations and Region penalty.
+The same restricted serializers apply even to owned records. No Customer name/mobile,
+contact fields, addresses, descriptions, private media/reasons, assignment identity or
+user/security internals are included. Location IDs and matching requirements/financials
+are exposed only within the Workspace.
+
+At most 1,000 coarse candidates are evaluated per request. The query fetches at most
+1,001 to detect overflow; overflow returns a clear 400 before scoring, rather than
+silently returning a partial ranking. Within that bound all qualifying matches are
+ranked, then paginated at 50 with `?page=N`, `count/next/previous/results`. Repeat the
+same POST body on subsequent pages; results are live, not a saved snapshot. No client
+page-size or evaluation-cap override exists. Out-of-range pages use DRF 404 behavior.
+Region joins/prefetches prevent per-candidate queries. Requests follow Workspace ->
+User -> Profile locking and reauthorize current actor state; only absent-profile lazy
+creation may write. Source records, preferences, runtime options and results are never
+persisted. No Tasks, notifications, pass workflow or frontend is included.
 
 ### Future persisted results
 A Match connects one File and one Customer with:

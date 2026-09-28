@@ -167,23 +167,34 @@ def evaluate_match(property_file, customer, profile):
         return _evaluate(property_file, customer, profile)
 
 
+def evaluate_eligibility(property_file, customer, profile):
+    """Reuse v1 eligibility before live runtime constraints; no formula changes."""
+    with localcontext(MATH_CONTEXT):
+        return _eligibility(property_file, customer, profile)
+
+
+def _eligibility(file, customer, profile):
+    if file.workspace_id != customer.workspace_id:
+        return "workspace_mismatch", None
+    if (customer.customer_type, file.transaction_type) not in (("buyer", "sale"), ("tenant", "rent")):
+        return "type_mismatch", None
+    if file.status != "active":
+        return "file_not_active", None
+    if customer.status != "active":
+        return "customer_not_active", None
+    budget = _budget(file, customer, profile)
+    return (None if budget.passed else "budget_outside_range"), budget
+
+
 def _evaluate(file, customer, profile):
     minimum = Decimal(profile.minimum_score)
     def reject(code, budget=None):
         return MatchingResult(False, False, None, None, minimum, code, code,
                               (explain(code),), (), budget, None)
 
-    if file.workspace_id != customer.workspace_id:
-        return reject("workspace_mismatch")
-    if (customer.customer_type, file.transaction_type) not in (("buyer", "sale"), ("tenant", "rent")):
-        return reject("type_mismatch")
-    if file.status != "active":
-        return reject("file_not_active")
-    if customer.status != "active":
-        return reject("customer_not_active")
-    budget = _budget(file, customer, profile)
-    if not budget.passed:
-        return reject("budget_outside_range", budget)
+    code, budget = _eligibility(file, customer, profile)
+    if code:
+        return reject(code, budget)
     preferred, region_reason = _preferred(file, customer)
     if region_reason == "region_workspace_mismatch":
         return reject(region_reason)

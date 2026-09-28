@@ -218,7 +218,7 @@ of inactive consultants. All Customer statuses remain readable within actor scop
 Workspace is derived from authenticated server context. Missing, foreign-workspace
 and out-of-scope Customer UUIDs return the same 404. There is no cross-owner browsing
 surface: name/mobile/description are never returned outside authorized scope. Lists
-include name, while mobile and notes are detail-only. Future Matching must use its
+include name, while mobile and notes are detail-only. Live Matching uses its
 own restricted representation. Assignee summaries contain only UUID, username,
 first_name and last_name; no phone, password or permission internals are exposed.
 
@@ -257,7 +257,7 @@ never body/query/header authority. Out-of-scope/missing files and child IDs retu
 Authorized detail responses include owner_name, owner_phone and visit_contact_phone.
 List responses omit contacts, address, notes, images and reasons. There is no restricted
 cross-owner detail/list response in this feature: out-of-scope readers receive no file.
-Future Matching will define its own restricted candidate representation. Consultant
+Live Matching uses its own restricted candidate representation. Consultant
 summaries expose only UUID, username, first_name and last_name.
 
 Strict write allowlists reject workspace, code, timestamps, source and privilege fields.
@@ -311,4 +311,20 @@ Ownership/workspace/timestamps and unknown fields are rejected in payloads; quer
 parameters cannot select another owner. Services recheck current database membership
 and active state while holding Workspace/User locks. Settings disclose no other
 user's data and do not change PropertyFile/Customer operational permissions.
-Future restricted Matching candidate visibility remains separate and unimplemented.
+Restricted live Matching candidate visibility is separate, as documented below.
+
+### Live Matching v1
+Matching POSTs require operational authorization on the fixed Customer/PropertyFile
+source, rechecked against current database state. Agency managers retain workspace
+scope, range managers the union of their active managed Ranges, and consultants own
+sources only. Secretary/admin denial remains; owner/staff/superuser flags do not expand
+scope. Out-of-scope/foreign sources return 404 without creating a profile.
+After authorization, candidate discovery is intentionally Workspace-wide across
+consultants and Ranges. Every candidate receives the same restricted Matching output,
+including owned candidates. Customer names/mobile, all contacts/addresses/notes,
+images, valuable reasons and assignee identity are omitted. No operational detail
+serializer is reused. This grants no access to the corresponding operational detail API.
+Viewer-owned base settings and validated in-memory overrides determine results.
+Temporary «خط قرمز» and overrides never grant permissions or persist. No standalone
+Workspace-wide browse endpoint or persisted recommendations exist. See DOMAIN for
+exact age applicability, criterion checks, pagination and the 1,000-candidate cap.
