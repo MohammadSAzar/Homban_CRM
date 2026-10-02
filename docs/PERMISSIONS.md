@@ -346,5 +346,18 @@ their guessed recommendation IDs fail closed and manual actions are denied. Reta
 rows grant no access to newly unauthorized source/contact data. Internal services
 return domain models, not customer-facing payloads; future feed/detail callers must
 use scoped queries plus restricted serialization. No feed API exists in this task.
-Automatic generation, Celery, collaboration requests, notifications and frontend remain
-future work; existing operational and live Matching permissions are unchanged.
+Automatic generation is described below; collaboration requests, notifications and
+frontend remain future work. Operational and live Matching permissions are unchanged.
+
+### Automatic recommendation workers
+Source events are Workspace-scoped internal work. Only current consultant owners of
+one or both sources are evaluated, each with their own profile; profile-change work
+affects only that viewer. File/Customer changes may affect both owners. Range boundaries
+do not restrict same-Workspace candidate discovery. No agency/staff/owner flag creates
+third-party recommendations. Inactive or former viewers are invalidated, not deleted.
+Active access checks current ownership immediately, even before queued reconciliation.
+No source/contact data or profile settings are placed in queue payloads or outbox rows.
+The batch persistence sink is private, reuses lifecycle transitions and runs under
+Workspace/source locks; it is not an alternate API write path. Recovery is internal-only.
+Consultants do not manage jobs, refresh modes or validity flags. No CollaborationRequest,
+collaboration notification, daily feed, reminder/task, frontend or deal workflow is added.

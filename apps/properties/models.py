@@ -6,6 +6,7 @@ from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator
 from django.db import models, transaction
 from django.utils.translation import gettext_lazy as _
+from apps.matching.generation_events import track_save, FILE_FIELDS
 
 
 NONNEGATIVE = MinValueValidator(0, message=_("مقدار نمی‌تواند منفی باشد."))
@@ -134,6 +135,7 @@ class PropertyFile(models.Model):
         if errors:
             raise ValidationError(errors)
 
+    @track_save("file", FILE_FIELDS)
     def save(self, *args, **kwargs):
         update_fields = kwargs.get("update_fields")
         if update_fields is not None:

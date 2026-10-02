@@ -5,6 +5,7 @@ from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator
 from django.db import models, router, transaction
 from django.utils.translation import gettext_lazy as _
+from apps.matching.generation_events import track_save, track_preferences, CUSTOMER_FIELDS
 
 
 NONNEGATIVE = MinValueValidator(0, message=_("مقدار نمی‌تواند منفی باشد."))
@@ -107,6 +108,7 @@ class Customer(models.Model):
         if errors:
             raise ValidationError(errors)
 
+    @track_save("customer", CUSTOMER_FIELDS)
     def save(self, *args, preferred_regions=UNSET, **kwargs):
         """Persist the canonical aggregate, including geography, under the workspace lock."""
         from apps.organizations.models import Workspace
@@ -185,7 +187,8 @@ class PreferenceQuerySet(models.QuerySet):
             for customer in customers:
                 if not customer.all_regions and not self.model.objects.using(self.db).filter(customer=customer).exclude(pk__in=ids).exists():
                     raise ValidationError({"preferred_regions": _("حداقل یک منطقه مورد نظر باید باقی بماند.")})
-            return super(PreferenceQuerySet, self.model.objects.using(self.db).filter(pk__in=ids)).delete()
+            with track_preferences(customer_ids, self.db):
+                return super(PreferenceQuerySet, self.model.objects.using(self.db).filter(pk__in=ids)).delete()
 
 
 class CustomerRegionPreference(models.Model):
@@ -230,7 +233,8 @@ class CustomerRegionPreference(models.Model):
             if stored and stored.customer_id != effective.customer_id:
                 if not type(self).objects.using(using).filter(customer_id=stored.customer_id).exclude(pk=self.pk).exists():
                     raise ValidationError({"preferred_regions": _("حداقل یک منطقه مورد نظر باید باقی بماند.")})
-            return super().save(*args, **kwargs)
+            with track_preferences(customer_ids, using):
+                return super().save(*args, **kwargs)
 
     def delete(self, using=None, keep_parents=False):
         return type(self).objects.using(using or self._state.db).filter(pk=self.pk).delete()

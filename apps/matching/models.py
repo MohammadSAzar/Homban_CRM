@@ -6,6 +6,7 @@ from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator, MaxValueValidator
 from django.db import models
 from django.utils.translation import gettext_lazy as _
+from .generation_events import track_save
 
 
 WEIGHT_FIELDS = ("area", "bedrooms", "building_age", "region", "parking", "elevator", "storage", "balcony")
@@ -55,6 +56,7 @@ class MatchingProfile(models.Model):
             if original and original != self.user_id:
                 raise ValidationError({"user": _("مالک تنظیمات قابل تغییر نیست.")})
 
+    @track_save("profile", SETTING_FIELDS)
     def save(self, *args, **kwargs):
         effective = self
         if kwargs.get("update_fields") is not None and not self._state.adding:
@@ -69,3 +71,4 @@ class MatchingProfile(models.Model):
         return super().save(*args, **kwargs)
 
 from .recommendation_models import MatchRecommendation  # noqa: E402,F401
+from .work_models import RecommendationWork  # noqa: E402,F401

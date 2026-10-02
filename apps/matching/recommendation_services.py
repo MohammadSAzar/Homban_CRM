@@ -55,7 +55,7 @@ def _association_valid(viewer, file, customer):
                 and viewer.pk in (file.assigned_to_id, customer.assigned_to_id))
 
 
-def _apply_evaluation(row, result, *, source_valid, change):
+def _apply_evaluation(row, result, *, source_valid, change, persist=True):
     """Private sink: caller has evaluated fresh locked sources with the viewer's base profile."""
     was_expired = not row.is_source_valid
     if result.recommended and row.user_status in (row.Status.REJECTED, row.Status.DONE):
@@ -68,7 +68,8 @@ def _apply_evaluation(row, result, *, source_valid, change):
     row.minimum_score = result.minimum_score
     row.formula_version = result.formula_version
     row.last_evaluated_at = timezone.now()
-    row.save(_token=_LIFECYCLE_WRITE)
+    if persist:
+        row.save(_token=_LIFECYCLE_WRITE)
     return row
 
 

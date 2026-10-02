@@ -3,6 +3,7 @@ import uuid
 from django.contrib.auth.models import AbstractUser
 from django.db import models
 from django.utils.translation import gettext_lazy as _
+from apps.matching.generation_events import track_save
 
 
 class User(AbstractUser):
@@ -77,6 +78,10 @@ class User(AbstractUser):
         ]
         verbose_name = _("کاربر")
         verbose_name_plural = _("کاربران")
+
+    @track_save("profile", ("role", "is_active", "workspace_id"), creation=False, material=False)
+    def save(self, *args, **kwargs):
+        return super().save(*args, **kwargs)
 
     def __str__(self):
         return self.get_full_name() or self.username

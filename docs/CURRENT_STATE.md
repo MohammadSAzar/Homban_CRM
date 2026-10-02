@@ -502,7 +502,7 @@ foundation uses Django's environment-backed secret as SimpleJWT's default signin
 ## Not yet implemented / not confirmed as implemented
 Treat these as future work unless repository inspection proves otherwise:
 - Full permission framework
-- Automatic recommendation generation and bulk/background Matching
+- Collaboration requests and Daily Tasks feed APIs
 - Pass/collaboration workflow
 - Task/calendar
 - Chat
@@ -605,3 +605,33 @@ creation on MySQL. The single full coverage run passed 1,018 tests with 99% over
 coverage and 100% statement coverage for the new recommendation model/services.
 Django check, migration-drift check and diff check passed. Migration 0002 creates
 only the recommendation table; no existing source/domain schema was changed.
+
+## Automatic recommendation generation
+Matching input saves and preference changes now record transactional, Workspace-scoped
+RecommendationWork outbox rows. Celery/Redis transport is configured; on_commit publishes
+only IDs after successful writes, and broker failure preserves pending work for internal
+recovery. No scoring runs in operational requests. Metadata-only changes create no work.
+Current owner-viewers receive independent base-profile scores. Source changes reconcile
+both owners and historical rows; profile changes affect only that viewer's universe.
+New qualifying pairs are discovered, not merely existing rows refreshed.
+
+Jobs use 25-row/pair chunks, keyset continuations, batched relations and private lifecycle
+persistence. Workspace locks, durable step tokens and last_generation_event prevent
+duplicate/stale overwrites; pending material context survives out-of-order recovery.
+Reassignment history, source expiry, threshold distinction and seen-score baseline rules
+are preserved. Internal pending-work recovery and optional Workspace/viewer reconciliation
+are available without any customer-facing controls. See DOMAIN for worker/recovery setup.
+
+Migration matching/0003_recommendation_generation.py adds the outbox/progress table and
+the per-recommendation generation watermark. Existing formulas and Live Matching endpoints
+are unchanged. No CollaborationRequest, collaboration notifications, Daily Tasks feed,
+frontend, manual reminder/tasks or negotiation/deal workflow is implemented.
+
+Verification: 51 focused generation tests passed, including MySQL concurrent duplicate
+processing, rollback/on_commit capture, independent viewer profiles, stale-event ordering,
+recovery overtaking material work, bounded continuation and constant relation-query counts.
+The single full coverage run passed 1,069 tests, with 99% overall coverage and 96.04%
+combined statement coverage for generation.py, generation_events.py, tasks.py and
+work_models.py. Django, migration-drift and diff checks passed. Broker publication is
+isolated in tests; operational deployment still requires Redis, a running Celery worker
+and applying the new migration. Production deployment itself remains incomplete.

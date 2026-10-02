@@ -2,6 +2,7 @@ import uuid
 
 from django.db import models
 from django.utils.translation import gettext_lazy as _
+from apps.matching.generation_events import track_save
 
 
 class Workspace(models.Model):
@@ -75,6 +76,10 @@ class Workspace(models.Model):
         verbose_name = _("مجموعه")
         verbose_name_plural = _("مجموعه‌ها")
         ordering = ["name"]
+
+    @track_save("workspace", ("is_active",), creation=False, material=False)
+    def save(self, *args, **kwargs):
+        return super().save(*args, **kwargs)
 
     def __str__(self):
         return self.name

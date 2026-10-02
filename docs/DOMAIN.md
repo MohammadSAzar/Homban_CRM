@@ -571,7 +571,8 @@ is an internal single-pair command. It locks current data, evaluates using only 
 viewer's persisted base MatchingProfile, and applies the verified result privately.
 No caller-supplied score, runtime overrides or hard constraints are accepted. A first
 non-recommended evaluation creates no row; existing rows remain even when no longer
-recommended. This is not automatic generation or candidate discovery.
+recommended. Automatic generation below reuses this lifecycle's private application
+function with batch persistence; the standalone command still evaluates one pair.
 
 System flags are independent of manual status:
 - is_source_valid: both source statuses are active. A budget/type/threshold failure
@@ -586,7 +587,7 @@ current ownership of BOTH sides. Manual commands never invoke the engine. Source
 expiry preserves manual status; expired is not a user-selectable status.
 
 Frozen `ChangeContext(material_inputs_changed=False, sources_became_operational=False)`
-is supplied by future trusted generation. It must reflect actual events, not score
+is supplied by trusted generation. It must reflect actual events, not score
 variation or updated_at. If recommended, rejected/done rows become new on a material
 change or source restoration. Restoration observed in the previous persisted invalid
 source flag is also recognized; the explicit context supports restoration between
@@ -623,7 +624,82 @@ still apply, but cross-table ownership cannot be guaranteed by a simple CHECK.
 No contacts, names, notes, addresses, images, full result JSON or profile settings are
 copied into recommendations. Sources are never mutated. No automatic generation,
 Celery processing, collaboration requests, daily feed APIs, notifications or frontend
-are implemented by this foundation. Existing live Matching remains non-persistent.
+were implemented by the foundation itself. Generation is implemented separately below.
+Existing live Matching remains non-persistent.
+
+### Automatic recommendation generation
+Normal PropertyFile/Customer/model and API saves compare persisted Matching input
+values before/after the aggregate transaction, including update_fields and Customer
+preferred Regions. Known scalar inputs are enumerated in generation_events.py; phones,
+notes, images, valuable reasons, names and updated_at do not trigger work. Profile
+settings changes/reset use the same comparison. Region activation affects files using
+that Region and all_regions Customers; explicit historical Region links retain their
+existing engine semantics. City activation does not alter the finalized engine formula.
+Direct preference save/delete and M2M add/remove paths also capture changes; nested
+aggregate operations avoid duplicate events. Raw SQL/QuerySet bulk source updates are
+maintenance-only and require explicit reconciliation; they bypass ordinary model hooks.
+
+Each committed change records a RecommendationWork outbox row containing Workspace,
+target kind/ID and bounded continuation state, never source contacts or model payloads.
+Publication uses transaction.on_commit. Rollbacks discard both data changes and work.
+Broker failures leave durable pending work and do not undo committed business writes.
+Celery runs the work asynchronously; operational requests never evaluate candidates.
+
+File/Customer events first reconcile existing affected recommendations, including
+inactive/type-incompatible sources and former owners, then discover new active,
+same-Workspace, compatible pairs with valid assignment/location links. A pair has
+one viewer for own-own ownership or up to two current consultant-owner viewers.
+Every viewer uses their own base profile, loaded in a batch; missing profiles are
+lazily created only for valid viewers actually evaluated. No third-party viewer or
+runtime live-Matching option enters generation. Profile events reconcile/discover only
+that viewer's universe, leaving the other owner's row untouched. Region work remains
+Workspace-local. Account/Workspace entitlement changes trigger ordinary reconciliation,
+not material reactivation, without broadening operational permissions.
+
+The pure evaluate_match function remains the only scoring authority. Its unrounded
+recommendation decision and existing lifecycle application are reused. Source expiry,
+below-threshold state, reversible manual statuses, own-own DONE restriction and viewed
+score baselines retain foundation semantics. Known Matching input changes may reactivate
+rejected/done only when recommended and entitled; new/seen are preserved. No score-only
+or metadata-only inference of material change is made. Reassignment never blocks and
+former-owner history stays inaccessible through current-owner scopes; new owners get
+independent evaluation. Seen score improvements never overwrite the viewing baseline.
+
+Each task processes at most 25 existing rows, or one File with at most 25 Customers
+(at most 50 owner-specific evaluations). UUID keyset cursors continue across tasks;
+there is no full Cartesian load or silent truncation. Region joins, preference prefetch,
+bulk user/profile/row loading and a private validated bulk persistence sink keep relation
+queries constant as candidates increase. Missing-profile creation is bounded by the
+current chunk. All normal source writes and jobs follow Workspace-first locking.
+
+Work IDs are monotonically allocated under the Workspace lock. Each projection stores
+last_generation_event. Jobs reload authoritative current records/settings under that
+same lock: older events cannot overwrite rows processed by newer events. Durable step
+tokens make duplicate delivery/continuation a no-op; chunk writes and cursor advancement
+commit atomically. Database failures retry with backoff (five retries), and exhausted
+work remains recoverable. Material-event high-water marks per relevant target preserve
+unconsumed material context when a newer ordinary recovery overtakes older work.
+Completed outbox rows retain these markers; do not purge them without a future safe
+compaction policy. No full status history or result JSON is stored.
+
+Internal recovery: recover_pending(after_id=0, limit=100) republishes a bounded page
+of pending work; recover_recommendations chains those pages. reconcile_workspace(id,
+viewer_id=None) schedules a bounded ordinary repair/discovery after maintenance, optionally
+for one viewer. Recovery has no customer-facing endpoint and does not continuously scan
+all Workspaces. It preserves statuses unless applicable unconsumed material events or
+the existing source-restoration rule warrant reactivation.
+
+Deployment requires applying matching/0003_recommendation_generation.py, installing
+requirements and providing CELERY_BROKER_URL (default local Redis). Start a worker with
+`celery -A config worker -l INFO`; local Windows development uses `--pool=solo`.
+There is no result backend or Beat requirement. Following broker/worker outages, an
+operator may enqueue `apps.matching.tasks.recover_recommendations.delay()` from a
+trusted Django shell. Task payloads contain only work ID and step. Tests isolate broker
+publication and execute real DB task bodies; Redis service provisioning is operational
+setup. Celery wiring follows its [Django integration documentation](https://docs.celeryq.dev/en/stable/django/first-steps-with-django.html).
+
+CollaborationRequest, collaboration notifications, Daily Tasks feed, frontend, manual
+reminders/tasks and negotiation/deal workflow are NOT implemented.
 
 ## Pass
 "Pass" is cross-consultant collaboration around a candidate file/customer match.

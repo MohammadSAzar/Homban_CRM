@@ -2,6 +2,7 @@ import uuid
 
 from django.db import models
 from django.utils.translation import gettext_lazy as _
+from apps.matching.generation_events import track_save
 from django.core.exceptions import ValidationError
 
 
@@ -187,6 +188,7 @@ class Region(models.Model):
                     }
                 )
 
+    @track_save("region", ("is_active", "city_id", "workspace_id"), creation=False)
     def save(self, *args, **kwargs):
         self.full_clean()
         return super().save(*args, **kwargs)

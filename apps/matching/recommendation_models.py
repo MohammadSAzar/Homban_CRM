@@ -56,6 +56,7 @@ class MatchRecommendation(models.Model):
     created_at = models.DateTimeField(auto_now_add=True, verbose_name=_("زمان ایجاد"))
     updated_at = models.DateTimeField(auto_now=True, verbose_name=_("زمان تغییر"))
     last_evaluated_at = models.DateTimeField(verbose_name=_("آخرین ارزیابی"))
+    last_generation_event = models.PositiveBigIntegerField(default=0, editable=False, verbose_name=_("آخرین رویداد پردازش‌شده"))
 
     objects = RecommendationQuerySet.as_manager()
 
