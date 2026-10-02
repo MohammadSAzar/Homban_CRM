@@ -326,5 +326,25 @@ images, valuable reasons and assignee identity are omitted. No operational detai
 serializer is reused. This grants no access to the corresponding operational detail API.
 Viewer-owned base settings and validated in-memory overrides determine results.
 Temporary «خط قرمز» and overrides never grant permissions or persist. No standalone
-Workspace-wide browse endpoint or persisted recommendations exist. See DOMAIN for
+Workspace-wide browse endpoint exists. These live calls do not persist recommendations. See DOMAIN for
 exact age applicability, criterion checks, pagination and the 1,000-candidate cap.
+
+### Saved recommendation lifecycle
+MatchRecommendation belongs to a consultant who owns at least one side of the pair
+in the same Workspace. Agency/range-manager scope, ownership flags and staff/superuser
+flags grant no extra saved-recommendation rights. Each owner of a two-consultant pair
+may have an independent projection evaluated with their own base profile.
+Manual actions are viewer-only and check current database ownership/account state.
+Done requires ownership of BOTH sources; seen/rejected remain reversible. A seen
+action is an actual detail-open event and records the score baseline without scoring.
+Manual actions cannot supply score, validity, viewer, source IDs or evaluation metadata.
+
+Losing both sources through reassignment does not block reassignment or delete history.
+Reconciliation invalidates the viewer association while retaining manual status and
+historical metadata. Current-owner query scopes exclude former owners immediately;
+their guessed recommendation IDs fail closed and manual actions are denied. Retained
+rows grant no access to newly unauthorized source/contact data. Internal services
+return domain models, not customer-facing payloads; future feed/detail callers must
+use scoped queries plus restricted serialization. No feed API exists in this task.
+Automatic generation, Celery, collaboration requests, notifications and frontend remain
+future work; existing operational and live Matching permissions are unchanged.

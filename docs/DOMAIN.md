@@ -502,8 +502,8 @@ there is at most one file Region read and one preference existence read; all_reg
 skips the preference read. The evaluator does not populate input relation caches.
 
 The pure evaluator remains free of runtime overrides and hard constraints. Live
-request handling below adds those options without changing v1 formulas. Persisted
-Match/recommendation results, notifications and collaboration remain unimplemented.
+request handling below adds those options without changing v1 formulas. Saved
+recommendation lifecycle is separate below; notifications and collaboration remain future work.
 
 ### Live Matching v1
 `POST /api/v1/customers/<uuid>/matches/` and
@@ -557,15 +557,73 @@ User -> Profile locking and reauthorize current actor state; only absent-profile
 creation may write. Source records, preferences, runtime options and results are never
 persisted. No Tasks, notifications, pass workflow or frontend is included.
 
-### Future persisted results
-A Match connects one File and one Customer with:
-- Compatibility score
-- Explanation/reasons
-- Formula/version used
-- Potential cross-consultant collaboration information
-- State if needed later
+### MatchRecommendation foundation
+MatchRecommendation is a persisted operational projection unique on
+`(viewer, property_file, customer)`. The viewer must currently be an active consultant
+in the same active Workspace, owning at least one side. Own-own pairs have one viewer;
+two-owner pairs can have independent rows, scores and manual statuses for each owner.
+Workspace is derived through the references, not duplicated. UUID and timezone-aware
+created_at/updated_at/last_evaluated_at follow project conventions. PROTECT on all three
+references retains business history; reassignment remains allowed.
 
-Matching should not mutate source records merely because a match exists.
+`recommendation_services.refresh_recommendation(viewer, property_file, customer, change)`
+is an internal single-pair command. It locks current data, evaluates using only the
+viewer's persisted base MatchingProfile, and applies the verified result privately.
+No caller-supplied score, runtime overrides or hard constraints are accepted. A first
+non-recommended evaluation creates no row; existing rows remain even when no longer
+recommended. This is not automatic generation or candidate discovery.
+
+System flags are independent of manual status:
+- is_source_valid: both source statuses are active. A budget/type/threshold failure
+  does not itself expire otherwise active sources.
+- is_currently_recommended: the authoritative unrounded engine recommendation decision.
+- is_viewer_valid: the consultant still has a valid same-Workspace owner association.
+
+Manual statuses are new, seen, done and rejected. `change_manual_status` accepts seen,
+rejected or done, reversibly, only for the current viewer/owner. Seen represents an
+explicit detail-open event, including reopening an already seen item. Done requires
+current ownership of BOTH sides. Manual commands never invoke the engine. Source
+expiry preserves manual status; expired is not a user-selectable status.
+
+Frozen `ChangeContext(material_inputs_changed=False, sources_became_operational=False)`
+is supplied by future trusted generation. It must reflect actual events, not score
+variation or updated_at. If recommended, rejected/done rows become new on a material
+change or source restoration. Restoration observed in the previous persisted invalid
+source flag is also recognized; the explicit context supports restoration between
+evaluations. New/seen statuses are not reset by refreshed scores or these events.
+No reactivation timestamp/count is stored because this lifecycle needs neither.
+
+Reassignment never blocks on recommendations. If the viewer loses both sides, keep
+the historical row/status/score/view baseline, invalidate its association and current
+recommendation during reconciliation, and deny manual actions immediately. The
+`for_viewer`/`active_for_viewer` query scopes check CURRENT ownership, role, Workspace
+and active account state even before reconciliation. Active scope also checks source
+statuses and saved validity/recommendation flags; it does not override manual status.
+Future feeds must use these scopes and their own restricted serialization, never raw
+model relations. New owners are reconciled independently. A historical done status
+survives ownership loss, but a new done action still requires ownership of both sides.
+
+Scores use Decimal(33,30), flooring only for MySQL storage AFTER the engine decision.
+The persisted minimum_score is evaluation metadata, not a copy of personal settings.
+`score_at_last_view` changes only on an actual seen action, never on recalculation.
+The derived has_improved_score flag requires seen status, valid/recommended state and
+current_score > score_at_last_view >= the latest evaluated minimum_score. Unknown,
+expired or below-threshold scores do not show improvement. Reopening details updates
+the baseline and clears the indicator. Differences below storage precision are not
+badged; threshold eligibility always comes from the full-precision engine result.
+
+Workspace -> User -> File -> Customer locks serialize lifecycle work with operational
+writes; projection/profile locks and the unique DB key protect repeated/concurrent
+upserts. Model validation preserves immutable references and validates the effective
+stored state for update_fields. Normal save, bulk_create, bulk_update, QuerySet.update
+and deletion are service-guarded. Deliberate raw SQL/base QuerySet bypasses remain an
+internal maintenance boundary: database uniqueness, scalar checks and foreign keys
+still apply, but cross-table ownership cannot be guaranteed by a simple CHECK.
+
+No contacts, names, notes, addresses, images, full result JSON or profile settings are
+copied into recommendations. Sources are never mutated. No automatic generation,
+Celery processing, collaboration requests, daily feed APIs, notifications or frontend
+are implemented by this foundation. Existing live Matching remains non-persistent.
 
 ## Pass
 "Pass" is cross-consultant collaboration around a candidate file/customer match.

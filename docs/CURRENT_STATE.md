@@ -502,7 +502,7 @@ foundation uses Django's environment-backed secret as SimpleJWT's default signin
 ## Not yet implemented / not confirmed as implemented
 Treat these as future work unless repository inspection proves otherwise:
 - Full permission framework
-- Recommendation persistence and bulk/background Matching
+- Automatic recommendation generation and bulk/background Matching
 - Pass/collaboration workflow
 - Task/calendar
 - Chat
@@ -549,7 +549,7 @@ Frozen results carry structured explanations and no contact data. The evaluator 
 non-persistent and does not mutate inputs; loaded relations yield zero queries,
 otherwise at most two bounded reads. No endpoints or model/schema changes were added.
 Runtime options and live candidate APIs are implemented separately below; the pure
-engine remains unchanged in scope. Persisted recommendations remain unimplemented.
+engine remains unchanged in scope. Saved recommendation foundation is described below.
 
 Verification: 84 focused engine cases passed; the full regression/coverage run passed
 893 tests with 99% overall coverage and 100% engine/explanation statement coverage.
@@ -578,3 +578,30 @@ tests passed. The full coverage run passed 972 tests with 99% overall coverage.
 Query-count tests remain constant as candidates increase in both directions; actual
 1,000/1,001-candidate boundary tests verify evaluation and overflow rejection.
 Django, migration-drift and diff checks passed; no schema migration is required.
+
+## MatchRecommendation foundation
+Persisted viewer-specific pair identity and lifecycle are implemented in
+`recommendation_models.py` and `recommendation_services.py`, with migration
+`matching/0002_match_recommendation.py`. Only same-Workspace consultant owners qualify;
+two owners may have separate rows. Immutable protected references and database
+uniqueness preserve history. Scores/threshold/version and independent source,
+viewer-association and recommendation flags contain no copied contact data.
+
+Single-pair refresh uses the viewer's base profile and existing pure engine. Explicit
+change context controls reactivation; score/metadata changes alone never reset manual
+status. Seen/rejected/done transitions are reversible, done is own-own only, and
+detail-open records a last-viewed score baseline without scoring. Improvement is a
+derived flag against that baseline and the latest evaluated threshold.
+
+Reassignment is never blocked. Former-viewer rows remain historical, are invalidated
+on reconciliation, and are excluded immediately by current-ownership query scopes.
+Normal direct/bulk writes and deletion are guarded; lifecycle commands use transactions
+and existing Workspace-first locking. No automatic generation, Celery, collaboration
+requests, daily feed APIs, notifications or frontend are included. Live Matching and
+its non-persistent runtime options remain unchanged.
+
+Verification: 46 focused recommendation tests passed, including real concurrent
+creation on MySQL. The single full coverage run passed 1,018 tests with 99% overall
+coverage and 100% statement coverage for the new recommendation model/services.
+Django check, migration-drift check and diff check passed. Migration 0002 creates
+only the recommendation table; no existing source/domain schema was changed.

@@ -67,3 +67,5 @@ class MatchingProfile(models.Model):
                     setattr(effective, field.attname, getattr(self, field.attname))
         effective.full_clean()
         return super().save(*args, **kwargs)
+
+from .recommendation_models import MatchRecommendation  # noqa: E402,F401
