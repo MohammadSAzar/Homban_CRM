@@ -502,11 +502,11 @@ foundation uses Django's environment-backed secret as SimpleJWT's default signin
 ## Not yet implemented / not confirmed as implemented
 Treat these as future work unless repository inspection proves otherwise:
 - Full permission framework
-- Collaboration requests and Daily Tasks feed APIs
+- Daily Tasks unified feed APIs (CollaborationRequest v1 is implemented below)
 - Pass/collaboration workflow
 - Task/calendar
 - Chat
-- Notifications
+- Generic notifications/push/email/SMS (only the collaboration creation event exists)
 - Deals
 - External import workers
 - Voice/AI creation
@@ -624,8 +624,8 @@ are available without any customer-facing controls. See DOMAIN for worker/recove
 
 Migration matching/0003_recommendation_generation.py adds the outbox/progress table and
 the per-recommendation generation watermark. Existing formulas and Live Matching endpoints
-are unchanged. No CollaborationRequest, collaboration notifications, Daily Tasks feed,
-frontend, manual reminder/tasks or negotiation/deal workflow is implemented.
+are unchanged. CollaborationRequest is a separate feature below; Daily Tasks feed,
+frontend, manual reminder/tasks and negotiation/deal workflow remain unimplemented.
 
 Verification: 51 focused generation tests passed, including MySQL concurrent duplicate
 processing, rollback/on_commit capture, independent viewer profiles, stale-event ordering,
@@ -635,3 +635,33 @@ combined statement coverage for generation.py, generation_events.py, tasks.py an
 work_models.py. Django, migration-drift and diff checks passed. Broker publication is
 isolated in tests; operational deployment still requires Redis, a running Celery worker
 and applying the new migration. Production deployment itself remains incomplete.
+
+## CollaborationRequest v1
+Implemented consultant-to-consultant, score-free collaboration around one File/Customer.
+Migration `matching/0004_collaboration_request.py` adds CollaborationRequest and its
+one-to-one CollaborationEvent. Protected immutable references, canonical UUID participant
+ordering, database checks/uniqueness and Workspace-first service transactions prevent
+same/reverse duplicate requests and duplicate creation events.
+
+POST from own saved recommendation or five-minute signed Live Matching reference;
+GET participant detail; POST recipient status. See DOMAIN for exact routes. References
+bind current ownership via a keyed fingerprint without revealing candidate-owner identity.
+Submission reloads active same-Workspace source/participant state. Both participants see
+professional identities and conservative pair attributes, never contacts, notes, private
+media/reasons or any score/profile/runtime settings. Restricted operational access is
+unchanged. Recipient statuses are reversible and idempotent; opening NEW marks SEEN.
+
+Validity is read from authoritative sources under the Workspace lock, so reassignment
+immediately blocks actions and hides pair details without waiting for generation.
+History/manual status remain; same-participant restoration reuses the row and emits no
+new alert. One durable recipient creation event supports future feed integration.
+No Daily Tasks feed, frontend, generic notifications, manual tasks/reminders, visits,
+negotiation, commission or collaboration outcome workflow is implemented.
+
+Verification: 72 Collaboration tests passed (including real opposite-direction MySQL
+concurrency, rollback, signed-reference privacy/expiry, historical access and bounded
+preference queries). The 304 unchanged Matching regression tests passed separately.
+The single final coverage run passed 1,141 tests with 99% overall coverage and 100%
+statement coverage across all five collaboration modules. Django check, migration-drift
+check and diff check passed. Existing engine/profile/recommendation/generation/Live
+Matching tests were not modified. Only the new 0004 feature migration is required.

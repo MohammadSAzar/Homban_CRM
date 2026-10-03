@@ -346,8 +346,8 @@ their guessed recommendation IDs fail closed and manual actions are denied. Reta
 rows grant no access to newly unauthorized source/contact data. Internal services
 return domain models, not customer-facing payloads; future feed/detail callers must
 use scoped queries plus restricted serialization. No feed API exists in this task.
-Automatic generation is described below; collaboration requests, notifications and
-frontend remain future work. Operational and live Matching permissions are unchanged.
+Automatic generation and participant-only collaboration are described below.
+Operational and live Matching permissions are unchanged.
 
 ### Automatic recommendation workers
 Source events are Workspace-scoped internal work. Only current consultant owners of
@@ -359,5 +359,29 @@ Active access checks current ownership immediately, even before queued reconcili
 No source/contact data or profile settings are placed in queue payloads or outbox rows.
 The batch persistence sink is private, reuses lifecycle transitions and runs under
 Workspace/source locks; it is not an alternate API write path. Recovery is internal-only.
-Consultants do not manage jobs, refresh modes or validity flags. No CollaborationRequest,
-collaboration notification, daily feed, reminder/task, frontend or deal workflow is added.
+Consultants do not manage jobs, refresh modes or validity flags. Workers add no daily
+feed, reminder/task, frontend or deal workflow. Collaboration has a separate boundary.
+
+### CollaborationRequest v1
+Only current active consultant owners of opposite sides of a same-Workspace active pair
+may submit from their own saved recommendation or an authorized signed Live Matching
+reference. Agency/range authority, Workspace owner, staff and superuser flags do not bypass
+participation. Source reauthorization occurs under Workspace-first locking. Live references
+expire after five minutes and bind the actor/Workspace/pair plus a keyed ownership
+fingerprint; they disclose no other consultant identity, contacts or score.
+
+The original requester and recipient share one unordered-pair request, including reverse
+submissions and accepted/rejected history. Both see professional ID/username/name/role,
+but never consultant phones. Only recipient controls seen/accepted/rejected; incoming new
+detail opens mark seen. Requester cannot impersonate recipient. All inputs are strict.
+No listing, delete or unrestricted update exists; unrelated/foreign UUIDs fail closed.
+
+Valid detail uses one restricted pair shape for both participants: no Customer name/mobile,
+owner/visit contacts, addresses, notes, media or private reasons. No scores/profile/runtime
+settings appear in any collaboration response or event. Collaboration never grants access
+to another consultant's operational detail API. On reassignment/inactivity, history remains
+but pair details are null and manual actions are denied immediately. Cross-Workspace
+relationship changes deny the entire response. Restoration preserves recipient status.
+One durable creation event is for the original recipient only; no repeat/restoration spam.
+Future Daily Tasks must reuse this authorization boundary. Feed/frontend and generic
+notifications, manual reminders, visit/negotiation/commission/outcome workflows are absent.

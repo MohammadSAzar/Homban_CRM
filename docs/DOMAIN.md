@@ -503,7 +503,7 @@ skips the preference read. The evaluator does not populate input relation caches
 
 The pure evaluator remains free of runtime overrides and hard constraints. Live
 request handling below adds those options without changing v1 formulas. Saved
-recommendation lifecycle is separate below; notifications and collaboration remain future work.
+recommendation lifecycle and score-free collaboration requests are separate below.
 
 ### Live Matching v1
 `POST /api/v1/customers/<uuid>/matches/` and
@@ -698,8 +698,81 @@ trusted Django shell. Task payloads contain only work ID and step. Tests isolate
 publication and execute real DB task bodies; Redis service provisioning is operational
 setup. Celery wiring follows its [Django integration documentation](https://docs.celeryq.dev/en/stable/django/first-steps-with-django.html).
 
-CollaborationRequest, collaboration notifications, Daily Tasks feed, frontend, manual
-reminders/tasks and negotiation/deal workflow are NOT implemented.
+Generation itself does not add a feed, frontend, manual reminders/tasks or deal workflow.
+CollaborationRequest and its minimal recipient event are implemented separately below.
+
+### CollaborationRequest v1
+A request connects two consultants around one PropertyFile/Customer pair for manual
+coordination. It tracks no visit, negotiation, commission, outcome or free-text notes.
+Only active consultant owners of opposite sides in the same active Workspace may
+submit. Own-own pairs and unrelated viewers cannot collaborate; agency/range roles,
+Workspace ownership and staff/superuser flags confer no additional permission.
+
+CollaborationRequest has UUID identity, protected immutable File/Customer and original
+requester/recipient references, canonical participant_a/participant_b and timezone-aware
+timestamps. The database enforces participant_a < participant_b, orientation matching
+that participant set, valid manual status, and uniqueness of File + Customer + unordered
+participants. Both directions, including accepted/rejected requests, reuse the same row
+without resetting status. A different later owner pair may create a different row.
+
+Creation services hold the existing Workspace-first lock throughout authoritative source
+reload, canonical lookup and insertion. Opposite submissions therefore serialize before
+lookup, with database uniqueness as an additional safeguard. The request and its one
+CollaborationEvent commit together or both roll back. Normal direct/bulk writes and
+hard deletion are guarded, including partial saves; raw SQL/base QuerySet are privileged
+maintenance boundaries, not supported product write paths. Foreign keys use PROTECT.
+
+Endpoints:
+- POST `/api/v1/match-recommendations/<uuid>/collaboration-request/`: empty object;
+  own saved recommendation, valid viewer/source flags and current cross-owner sources.
+  No recipient recommendation/profile or recalculated score is required.
+- POST `/api/v1/collaboration-requests/from-live-match/`: `{ "reference": "..." }`.
+- GET `/api/v1/collaboration-requests/<uuid>/`: participant-only restricted detail.
+- POST `/api/v1/collaboration-requests/<uuid>/status/`: only `status`, one of seen,
+  accepted, rejected. Recipient-only, current-validity checked, idempotent.
+No list, DELETE, unrestricted PATCH or arbitrary pair-ID creation endpoint exists.
+Creation returns 201; duplicate reuse returns 200 with `created=false`, existing ID/URL,
+other consultant professional identity and a Persian already-exists message.
+
+Eligible returned cross-owner Live Matching rows include `collaboration_reference` only
+for a consultant who owns one side. This Django timestamp-signed reference expires after
+300 seconds and binds actor, Workspace, File and Customer, plus a keyed ownership
+fingerprint. Signing alone is not encryption: the fingerprint deliberately hides the
+other owner's UUID until collaboration exists. No score, profile settings or contacts
+enter the token. Redemption verifies signature/age/actor/Workspace, reloads current
+assignments, active accounts/sources, type compatibility and location/preference integrity.
+Assignment mismatch rejects redemption. Repeat redemption is idempotent. Existing
+Matching scoring, candidate restrictions, ordering and pagination are unchanged.
+
+Manual status is new/seen/accepted/rejected. Only the recipient responds; opening a new
+valid incoming detail marks it seen. Requester opens and accepted/rejected opens preserve
+status. Seen/accepted/rejected are reversible without text, confirmation or scoring.
+
+System `is_valid` is derived from current authoritative records, not a persisted stale
+flag: active Workspace/consultants, current two-owner association, active sources,
+compatible types and same-Workspace location integrity. Requests remain stored when
+invalid, preserving manual status. Invalid historical detail exposes participant/status
+metadata but returns null for both source details; manual actions fail. Workspace changes
+fail closed entirely. Same original participants returning to validity reuse history and
+preserve status without another event. No generation job is needed to revoke access.
+
+Both participants see IDs, usernames, first/last names and roles. They receive the same
+conservative pair representation: codes, location IDs, property characteristics,
+requirements and financial values. Customer name/mobile, owner/visit phones, owner name,
+addresses, private notes, media, valuable reasons and consultant phones are never exposed.
+Collaboration has NO score, threshold, formula breakdown, profile or runtime settings,
+in storage, responses or events. Operational access remains separately authorized.
+Joined sources/users and prefetched Regions with Cities bound relation queries, including
+repeated validity checks and serialization with multiple preferred Regions.
+
+CollaborationEvent is one UUID/timestamp record with a unique protected request reference.
+Its recipient is the immutable request recipient. It is a durable in-app alert foundation
+for the future Daily Tasks feed, not a generic notification system. Duplicate submissions,
+status changes, opens and system revalidation do not emit another creation event.
+
+Daily Tasks unified feed, frontend, generic notifications/push/email/SMS, manual reminders,
+visit scheduling, negotiation, commission splitting and collaboration outcome tracking
+remain unimplemented.
 
 ## Pass
 "Pass" is cross-consultant collaboration around a candidate file/customer match.

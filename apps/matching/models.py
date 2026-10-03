@@ -72,3 +72,5 @@ class MatchingProfile(models.Model):
 
 from .recommendation_models import MatchRecommendation  # noqa: E402,F401
 from .work_models import RecommendationWork  # noqa: E402,F401
+
+from .collaboration_models import CollaborationRequest, CollaborationEvent  # noqa: E402,F401

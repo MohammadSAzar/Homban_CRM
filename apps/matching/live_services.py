@@ -13,6 +13,7 @@ from apps.locations.models import Region
 from apps.organizations.models import Workspace
 from apps.properties.models import PropertyFile
 from apps.properties.policies import visible_files
+from .collaboration_references import issue_reference
 from .engine import evaluate_eligibility, evaluate_match
 from .hard_constraints import has_age_requirement, hard_constraint_failure
 from .live_serializers import (
@@ -97,4 +98,12 @@ def live_matches(*, actor, source_id, direction, data):
             matches.append((candidate, result))
     matches.sort(key=lambda pair: pair[0].pk)
     matches.sort(key=lambda pair: pair[1].final_score, reverse=True)
-    return [{"candidate": serializer(candidate).data, **matching_result_data(result)} for candidate, result in matches]
+    rows = []
+    for candidate, result in matches:
+        file, customer = (candidate, source) if from_customer else (source, candidate)
+        row = {"candidate": serializer(candidate).data, **matching_result_data(result)}
+        reference = issue_reference(actor, file, customer)
+        if reference is not None:
+            row["collaboration_reference"] = reference
+        rows.append(row)
+    return rows
