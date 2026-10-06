@@ -502,7 +502,7 @@ foundation uses Django's environment-backed secret as SimpleJWT's default signin
 ## Not yet implemented / not confirmed as implemented
 Treat these as future work unless repository inspection proves otherwise:
 - Full permission framework
-- Daily Tasks unified feed APIs (CollaborationRequest v1 is implemented below)
+- Manual reminder/calendar task APIs (Daily Tasks projection is implemented below)
 - Pass/collaboration workflow
 - Task/calendar
 - Chat
@@ -597,7 +597,7 @@ Reassignment is never blocked. Former-viewer rows remain historical, are invalid
 on reconciliation, and are excluded immediately by current-ownership query scopes.
 Normal direct/bulk writes and deletion are guarded; lifecycle commands use transactions
 and existing Workspace-first locking. No automatic generation, Celery, collaboration
-requests, daily feed APIs, notifications or frontend are included. Live Matching and
+requests, daily feed APIs, notifications or frontend were included in the foundation itself. Live Matching and
 its non-persistent runtime options remain unchanged.
 
 Verification: 46 focused recommendation tests passed, including real concurrent
@@ -624,8 +624,8 @@ are available without any customer-facing controls. See DOMAIN for worker/recove
 
 Migration matching/0003_recommendation_generation.py adds the outbox/progress table and
 the per-recommendation generation watermark. Existing formulas and Live Matching endpoints
-are unchanged. CollaborationRequest is a separate feature below; Daily Tasks feed,
-frontend, manual reminder/tasks and negotiation/deal workflow remain unimplemented.
+are unchanged. CollaborationRequest and Daily Tasks feed are separate features below; frontend, manual
+reminder/tasks and negotiation/deal workflow remain unimplemented.
 
 Verification: 51 focused generation tests passed, including MySQL concurrent duplicate
 processing, rollback/on_commit capture, independent viewer profiles, stale-event ordering,
@@ -654,8 +654,8 @@ unchanged. Recipient statuses are reversible and idempotent; opening NEW marks S
 Validity is read from authoritative sources under the Workspace lock, so reassignment
 immediately blocks actions and hides pair details without waiting for generation.
 History/manual status remain; same-participant restoration reuses the row and emits no
-new alert. One durable recipient creation event supports future feed integration.
-No Daily Tasks feed, frontend, generic notifications, manual tasks/reminders, visits,
+new alert. One durable recipient creation event supports the feed projection below.
+No frontend, generic notifications, manual tasks/reminders, visits,
 negotiation, commission or collaboration outcome workflow is implemented.
 
 Verification: 72 Collaboration tests passed (including real opposite-direction MySQL
@@ -665,3 +665,35 @@ The single final coverage run passed 1,141 tests with 99% overall coverage and 1
 statement coverage across all five collaboration modules. Django check, migration-drift
 check and diff check passed. Existing engine/profile/recommendation/generation/Live
 Matching tests were not modified. Only the new 0004 feature migration is required.
+
+## Daily Tasks / Suggested Program API v1
+
+Implemented a consultant-only unified read projection over saved recommendations and
+participant collaborations; no schema change or DailyTask persistence. SQL UNION ordering
+and 50-row database pagination precede page-only domain hydration. Default priority,
+type/status filters, sent/incoming direction, source-expired versus below-threshold semantics
+and invalid-history privacy are documented in DOMAIN. List reads never score or generate.
+
+Own recommendation detail refreshes one pair using the current viewer base profile, preserves
+rejected/done decisions and records the viewing baseline. Strict seen/rejected/done actions
+reuse lifecycle authorization without scoring. Collaboration detail/actions reuse finalized
+recipient-controlled behavior and remain score-free. All sources use restricted serializers.
+
+Both `/matches/weak/` POST routes reuse Live Matching with below-threshold selection,
+request-only overrides/constraints, deterministic pagination and the 1,000-candidate cap.
+Preview creates no recommendation, work or event. Existing signed references enable direct
+weak-pair collaboration with authoritative revalidation, no persisted score and no fake
+recommendation. Lazy profile initialization in preview/detail does not enqueue generation.
+
+No frontend, manual reminder/calendar, visits, negotiation/deal, commission, chat or generic
+notification delivery is implemented. Existing Matching formulas and schemas are unchanged.
+
+Verification: 69 new focused tests passed (57 Daily Tasks and 12 weak-preview cases),
+including mixed UNION pages, same-score/time UUID ties, historical validity, viewer-score
+isolation, detail viewing, strict actions, weak-reference reverse deduplication and the
+1,000/1,001 candidate boundary. All 376 unchanged Matching regressions passed. The single
+full coverage run passed 1,210 tests: 99% overall and 100% statement coverage across
+`daily_serializers.py`, `daily_services.py` and `daily_views.py`. Mixed populated feed pages
+use nine queries regardless of page size; recommendation detail uses a constant 46 through
+existing lifecycle validation/locking. Collaboration detail and weak preview also retain
+bounded query counts. Django and migration-drift checks passed; no migration is required.

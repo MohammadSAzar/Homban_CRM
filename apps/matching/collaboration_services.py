@@ -1,6 +1,6 @@
 """Participant-only commands. Workspace lock serializes source changes and opposite submissions."""
 from django.db import transaction
-from django.db.models import Prefetch, Q
+from django.db.models import Prefetch
 from django.utils.crypto import constant_time_compare
 from django.utils.translation import gettext_lazy as _
 from rest_framework.exceptions import NotFound, PermissionDenied, ValidationError
@@ -85,11 +85,7 @@ def open_request(*, actor, request_id, status=None):
     actor = _actor(actor)
     row = CollaborationRequest.objects.select_for_update().select_related(
         "requester__workspace", "recipient__workspace", "property_file__city", "property_file__region__city", "customer",
-    ).prefetch_related(Prefetch("customer__preferred_regions", queryset=Region.objects.select_related("city"))).filter(
-        Q(requester=actor) | Q(recipient=actor), pk=request_id,
-        requester__workspace_id=actor.workspace_id, recipient__workspace_id=actor.workspace_id,
-        property_file__workspace_id=actor.workspace_id, customer__workspace_id=actor.workspace_id,
-    ).first()
+    ).prefetch_related(Prefetch("customer__preferred_regions", queryset=Region.objects.select_related("city"))).for_participant(actor).filter(pk=request_id).first()
     if row is None:
         raise NotFound(_("درخواست همکاری یافت نشد."))
     if status is not None:

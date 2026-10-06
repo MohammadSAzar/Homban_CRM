@@ -344,8 +344,8 @@ Reconciliation invalidates the viewer association while retaining manual status 
 historical metadata. Current-owner query scopes exclude former owners immediately;
 their guessed recommendation IDs fail closed and manual actions are denied. Retained
 rows grant no access to newly unauthorized source/contact data. Internal services
-return domain models, not customer-facing payloads; future feed/detail callers must
-use scoped queries plus restricted serialization. No feed API exists in this task.
+return domain models, not customer-facing payloads; feed/detail callers must
+use scoped queries plus restricted serialization. The Daily Tasks API below does so.
 Automatic generation and participant-only collaboration are described below.
 Operational and live Matching permissions are unchanged.
 
@@ -374,7 +374,7 @@ The original requester and recipient share one unordered-pair request, including
 submissions and accepted/rejected history. Both see professional ID/username/name/role,
 but never consultant phones. Only recipient controls seen/accepted/rejected; incoming new
 detail opens mark seen. Requester cannot impersonate recipient. All inputs are strict.
-No listing, delete or unrestricted update exists; unrelated/foreign UUIDs fail closed.
+No general collaboration listing, delete or unrestricted update exists; unrelated/foreign UUIDs fail closed.
 
 Valid detail uses one restricted pair shape for both participants: no Customer name/mobile,
 owner/visit contacts, addresses, notes, media or private reasons. No scores/profile/runtime
@@ -383,5 +383,26 @@ to another consultant's operational detail API. On reassignment/inactivity, hist
 but pair details are null and manual actions are denied immediately. Cross-Workspace
 relationship changes deny the entire response. Restoration preserves recipient status.
 One durable creation event is for the original recipient only; no repeat/restoration spam.
-Future Daily Tasks must reuse this authorization boundary. Feed/frontend and generic
-notifications, manual reminders, visit/negotiation/commission/outcome workflows are absent.
+Daily Tasks reuses this authorization boundary. Frontend, generic notifications, manual
+reminders and visit/negotiation/commission/outcome workflows remain absent.
+
+### Daily Tasks / Suggested Program
+Only active consultants in an active Workspace may use the unified feed/detail/actions.
+Agency/range authority, purchaser ownership and staff/superuser flags never bypass this
+rule. Recommendations use current viewer ownership scope, including historical filters;
+no sibling viewer score, status, profile or breakdown is accessible. Collaboration uses
+original participant scope and current authoritative validity. Invalid participant history
+retains professional identities/status but hides source data and denies response actions.
+Incoming and sent cards are distinct; only the recipient changes collaboration status.
+
+Recommendation detail recalculates only its own viewer's one pair with base settings and
+records viewing. Manual actions cannot set scores, validity, sources, ownership or profile.
+All recommendation and collaboration source representations remain restricted: no Customer
+name/mobile, owner/visit contacts, address, notes, media, reasons or assignee internals.
+Collaboration never exposes Matching scores/settings, even to an owner of either source.
+
+Weak-preview endpoints retain operational source authorization and Workspace-wide candidate
+scope of Live Matching. Only eligible below-threshold pairs are returned, using the same
+restricted representation for owned and cross-owner candidates. No recommendation/work/event
+is created by preview. Signed collaboration references retain the existing expiry, ownership
+fingerprint and current participant revalidation; weak scores are not stored in collaboration.

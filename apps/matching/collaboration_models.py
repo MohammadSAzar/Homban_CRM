@@ -4,7 +4,7 @@ import uuid
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import models
-from django.db.models import F, Q
+from django.db.models import BooleanField, Case, Exists, F, OuterRef, Q, Value, When
 from django.utils.translation import gettext_lazy as _
 
 _COLLABORATION_WRITE = object()
@@ -16,6 +16,40 @@ def service_only(*args, **kwargs):
 
 class CollaborationQuerySet(models.QuerySet):
     update = bulk_update = bulk_create = delete = service_only
+
+    def for_participant(self, actor):
+        return self.filter(
+            Q(requester_id=actor.pk) | Q(recipient_id=actor.pk),
+            requester__workspace_id=actor.workspace_id, recipient__workspace_id=actor.workspace_id,
+            property_file__workspace_id=actor.workspace_id, customer__workspace_id=actor.workspace_id,
+        )
+
+    def with_validity(self):
+        # SQL counterpart of pair_is_valid for bounded filtering/pagination. Tests
+        # assert parity; detail continues to validate freshly loaded domain objects.
+        from apps.customers.models import CustomerRegionPreference
+        bad_preferences = CustomerRegionPreference.objects.filter(customer_id=OuterRef("customer_id")).exclude(
+            region__workspace_id=OuterRef("requester__workspace_id"),
+            region__city__workspace_id=OuterRef("requester__workspace_id"),
+        )
+        valid = Q(
+            requester__workspace__is_active=True, recipient__workspace__is_active=True,
+            requester__is_active=True, recipient__is_active=True,
+            requester__role="consultant", recipient__role="consultant",
+            requester__workspace_id=F("recipient__workspace_id"),
+            property_file__workspace_id=F("requester__workspace_id"),
+            customer__workspace_id=F("requester__workspace_id"),
+            property_file__status="active", customer__status="active",
+            property_file__city__workspace_id=F("requester__workspace_id"),
+            property_file__region__workspace_id=F("requester__workspace_id"),
+            property_file__region__city__workspace_id=F("requester__workspace_id"),
+            property_file__region__city_id=F("property_file__city_id"),
+        ) & ~Q(requester_id=F("recipient_id")) & (
+            Q(property_file__assigned_to_id=F("requester_id"), customer__assigned_to_id=F("recipient_id")) |
+            Q(property_file__assigned_to_id=F("recipient_id"), customer__assigned_to_id=F("requester_id"))
+        ) & (Q(property_file__transaction_type="sale", customer__customer_type="buyer") |
+             Q(property_file__transaction_type="rent", customer__customer_type="tenant")) & ~Exists(bad_preferences)
+        return self.annotate(current_validity=Case(When(valid, then=Value(True)), default=Value(False), output_field=BooleanField()))
 
 
 def pair_is_valid(file, customer, requester, recipient):

@@ -4,6 +4,8 @@ from decimal import Decimal, ROUND_DOWN, localcontext
 
 from django.core.exceptions import ValidationError
 from django.db import transaction
+from django.db.models import Prefetch
+from apps.locations.models import Region
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from rest_framework.exceptions import NotFound, PermissionDenied
@@ -17,6 +19,7 @@ from .engine import evaluate_match
 from .models import MatchRecommendation
 from .recommendation_models import _LIFECYCLE_WRITE
 from .services import own_profile
+from .generation_events import suppress_events
 
 
 @dataclass(frozen=True)
@@ -44,8 +47,8 @@ def _lock_pair(viewer_id, file_id, customer_id):
     workspace_id = PropertyFile.objects.values_list("workspace_id", flat=True).get(pk=file_id)
     Workspace.objects.select_for_update().get(pk=workspace_id)
     viewer = User.objects.select_for_update().select_related("workspace").get(pk=viewer_id)
-    file = PropertyFile.objects.select_for_update().select_related("region").get(pk=file_id)
-    customer = Customer.objects.select_for_update().prefetch_related("preferred_regions").get(pk=customer_id)
+    file = PropertyFile.objects.select_for_update().select_related("city", "region__city").get(pk=file_id)
+    customer = Customer.objects.select_for_update().prefetch_related(Prefetch("preferred_regions", queryset=Region.objects.select_related("city"))).get(pk=customer_id)
     return viewer, file, customer
 
 
@@ -55,10 +58,10 @@ def _association_valid(viewer, file, customer):
                 and viewer.pk in (file.assigned_to_id, customer.assigned_to_id))
 
 
-def _apply_evaluation(row, result, *, source_valid, change, persist=True):
+def _apply_evaluation(row, result, *, source_valid, change, persist=True, reactivate=True):
     """Private sink: caller has evaluated fresh locked sources with the viewer's base profile."""
     was_expired = not row.is_source_valid
-    if result.recommended and row.user_status in (row.Status.REJECTED, row.Status.DONE):
+    if reactivate and result.recommended and row.user_status in (row.Status.REJECTED, row.Status.DONE):
         if change.material_inputs_changed or change.sources_became_operational or was_expired:
             row.user_status = row.Status.NEW
     row.is_viewer_valid = True
@@ -120,6 +123,39 @@ def change_manual_status(*, actor, recommendation_id, status):
         raise ValidationError(_("انجام‌شده فقط برای فایل و مشتری متعلق به خود مشاور مجاز است."))
     row.user_status = status
     if status == row.Status.SEEN:
-        row.score_at_last_view = row.current_score
+        _record_view(row)
     row.save(_token=_LIFECYCLE_WRITE)
     return row
+
+
+def _record_view(row):
+    """Actual viewing acknowledges the current score without restoring rejected/done."""
+    if row.user_status == row.Status.NEW:
+        row.user_status = row.Status.SEEN
+    row.score_at_last_view = row.current_score
+
+
+@transaction.atomic
+def open_recommendation(*, actor, recommendation_id):
+    """Refresh exactly one authorized pair, preserve explicit decisions and record viewing."""
+    reference = MatchRecommendation.objects.for_viewer(actor).filter(pk=recommendation_id).first()
+    if reference is None:
+        raise NotFound(_("پیشنهاد یافت نشد."))
+    viewer, file, customer = _lock_pair(actor.pk, reference.property_file_id, reference.customer_id)
+    if not _association_valid(viewer, file, customer):
+        raise PermissionDenied(_("دسترسی به پیشنهاد مجاز نیست."))
+    if (file.city.workspace_id != viewer.workspace_id or file.region.workspace_id != viewer.workspace_id
+            or file.region.city_id != file.city_id
+            or any(region.workspace_id != viewer.workspace_id or region.city.workspace_id != viewer.workspace_id
+                   for region in customer.preferred_regions.all())):
+        raise NotFound(_("پیشنهاد یافت نشد."))
+    row = MatchRecommendation.objects.select_for_update().get(pk=reference.pk)
+    # A lazy default profile here must not turn a one-pair read into generation.
+    with suppress_events():
+        profile = own_profile(actor=viewer)
+    result = evaluate_match(file, customer, profile)
+    _apply_evaluation(row, result, source_valid=file.status == customer.status == "active",
+                      change=ChangeContext(), persist=False, reactivate=False)
+    _record_view(row)
+    row.save(_token=_LIFECYCLE_WRITE)
+    return row, file, customer, result

@@ -767,12 +767,76 @@ repeated validity checks and serialization with multiple preferred Regions.
 
 CollaborationEvent is one UUID/timestamp record with a unique protected request reference.
 Its recipient is the immutable request recipient. It is a durable in-app alert foundation
-for the future Daily Tasks feed, not a generic notification system. Duplicate submissions,
+for the Daily Tasks feed, not a generic notification system. Duplicate submissions,
 status changes, opens and system revalidation do not emit another creation event.
 
-Daily Tasks unified feed, frontend, generic notifications/push/email/SMS, manual reminders,
+Frontend, generic notifications/push/email/SMS, manual reminders,
 visit scheduling, negotiation, commission splitting and collaboration outcome tracking
 remain unimplemented.
+
+## Daily Tasks / Suggested Program API v1
+
+The consultant-only `GET /api/v1/daily-tasks/` is a read projection over existing
+MatchRecommendation and CollaborationRequest rows, with no DailyTask table. It neither
+scores pairs nor enqueues generation. Recommendation cards expose only the current
+viewer's persisted score, source codes, validity/recommendation/improvement flags and
+status/timestamps. Collaboration cards expose direction, participant professional
+identity, manual status and current validity; source codes are null when invalid.
+Collaboration cards/details/actions never contain scores, thresholds or profiles.
+
+Filters: `type=all|matching|collaboration` (default all) and
+`status=active|new|seen|rejected|done|accepted|expired|all` (default active).
+Matching+accepted and collaboration+done are invalid. Combined done/accepted select only
+the applicable model; rejected selects both. Recommendation active/new/seen require
+current viewer access, valid active sources and currently recommended state. Rejected/done
+are manual history; expired means source/viewer invalid, not merely below threshold.
+Former owners lose all recommendation access immediately, even with status=all.
+Collaboration active requires current validity and new/seen; named manual-status filters
+include that status independently of validity. Expired selects invalid participant history.
+Invalid collaboration history exposes metadata, never newly unauthorized source details.
+
+Default priority: new incoming collaboration, new recommendation, seen recommendation,
+seen incoming collaboration, sent collaboration, then explicitly requested history.
+Recommendations sort by persisted viewer score descending then UUID; collaborations by
+creation time descending then UUID. A database UNION projects normalized ordering keys,
+counts and slices a 50-item page, then loads only that page's domain rows. No full-history
+Python sort/load occurs. Page requests use `?page=N`; ordering is deterministic for
+unchanged data. Workspace-first locking keeps index and cards consistent per request.
+
+Endpoints:
+- `GET /api/v1/daily-tasks/matching/<uuid>/`
+- `POST /api/v1/daily-tasks/matching/<uuid>/status/`
+- `GET /api/v1/daily-tasks/collaboration/<uuid>/`
+- `POST /api/v1/daily-tasks/collaboration/<uuid>/status/`
+
+Recommendation detail locks/reloads one authorized pair, evaluates with the viewer's
+current base profile and updates that row through the existing lifecycle. NEW becomes
+SEEN; REJECTED/DONE remain unchanged on opening. Actual viewing records the current-score
+baseline and clears improvement. No bulk generation occurs. Strict manual status payloads
+accept seen/rejected/done without scoring; DONE requires current ownership of both sources.
+Collaboration detail/actions reuse the finalized participant service: only recipient NEW
+opens become SEEN, accepted/rejected remain, requester cannot change recipient status,
+and invalid requests deny mutation. No contact/private operational fields are returned.
+
+### Weak matching preview
+
+`POST /api/v1/customers/<uuid>/matches/weak/` and
+`POST /api/v1/property-files/<uuid>/matches/weak/` reuse live Matching source authorization,
+viewer base profile, temporary overrides/hard constraints, restricted serializers and
+formula. They return only eligible scored pairs below the effective threshold; ineligible,
+hard-constraint failures and recommended pairs are omitted. Scores sort descending then
+UUID, pages contain 50, and more than 1,000 coarse candidates rejects the request before
+scoring. Existing recommended-only `/matches/` behavior remains unchanged.
+
+Preview writes no recommendation, work, alert, override or result; only an absent viewer
+profile may be lazily initialized, without scheduling generation. Cross-owner consultant
+rows carry the existing five-minute actor/Workspace/pair/ownership-bound collaboration
+reference. Redemption uses the existing score-free CollaborationRequest path, revalidates
+current ownership and deduplicates reverse/repeat requests without a fake recommendation.
+Same-owner rows have no collaboration reference. Preview scores never enter collaboration.
+
+Frontend, manual reminders/calendar, visit scheduling, negotiation/deals, commission,
+chat and generic push/email/SMS notification delivery remain future work.
 
 ## Pass
 "Pass" is cross-consultant collaboration around a candidate file/customer match.

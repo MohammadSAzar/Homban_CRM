@@ -1,4 +1,5 @@
 from types import SimpleNamespace
+from contextlib import nullcontext
 
 from django.db import transaction
 from django.db.models import F, Prefetch
@@ -22,6 +23,7 @@ from .live_serializers import (
 )
 from .models import SETTING_FIELDS, WEIGHT_FIELDS
 from .services import own_profile
+from .generation_events import suppress_events
 
 MAX_CANDIDATES = 1000
 
@@ -44,7 +46,7 @@ def scoped_preferences(workspace_id):
 
 
 @transaction.atomic
-def live_matches(*, actor, source_id, direction, data):
+def live_matches(*, actor, source_id, direction, data, weak_preview=False):
     # Same lock order as operational writes; re-authorize current database state.
     try:
         workspace = Workspace.objects.select_for_update().get(pk=actor.workspace_id, is_active=True)
@@ -64,7 +66,9 @@ def live_matches(*, actor, source_id, direction, data):
     constraints = request.validated_data.get("hard_constraints", {})
     if from_customer and constraints.get("building_age") and not has_age_requirement(source):
         raise ValidationError({"hard_constraints": {"building_age": _("مشتری محدودیت سن بنا ندارد.")}})
-    base = own_profile(actor=actor)
+    # Viewing weak candidates must not enqueue workspace/profile generation.
+    with suppress_events() if weak_preview else nullcontext():
+        base = own_profile(actor=actor)
     profile = effective_profile(base, request.validated_data.get("overrides", {}))
     if source.status != "active":
         return []
@@ -94,7 +98,8 @@ def live_matches(*, actor, source_id, direction, data):
         if hard_constraint_failure(file, customer, constraints):
             continue
         result = evaluate_match(file, customer, profile)
-        if result.recommended:
+        include = (result.eligible and result.final_score is not None and result.final_score < profile.minimum_score) if weak_preview else result.recommended
+        if include:
             matches.append((candidate, result))
     matches.sort(key=lambda pair: pair[0].pk)
     matches.sort(key=lambda pair: pair[1].final_score, reverse=True)

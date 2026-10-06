@@ -11,11 +11,12 @@ class LivePagination(PageNumberPagination):
 
 class LiveMatchesView(APIView):
     direction = None
+    weak_preview = False
 
     def post(self, request, pk):
         page = LivePageSerializer(data=request.query_params.dict())
         page.is_valid(raise_exception=True)
-        matches = live_matches(actor=request.user, source_id=pk, direction=self.direction, data=request.data)
+        matches = live_matches(actor=request.user, source_id=pk, direction=self.direction, data=request.data, weak_preview=self.weak_preview)
         pagination = LivePagination()
         results = pagination.paginate_queryset(matches, request, view=self)
         return pagination.get_paginated_response(results)
@@ -27,3 +28,11 @@ class CustomerMatchesView(LiveMatchesView):
 
 class PropertyFileMatchesView(LiveMatchesView):
     direction = "property_file"
+
+
+class WeakCustomerMatchesView(CustomerMatchesView):
+    weak_preview = True
+
+
+class WeakPropertyFileMatchesView(PropertyFileMatchesView):
+    weak_preview = True
