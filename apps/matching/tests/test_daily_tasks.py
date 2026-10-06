@@ -64,11 +64,14 @@ def test_strict_feed_filters(world, query):
 
 
 @pytest.mark.parametrize('role', ['agency_manager','range_manager','secretary','admin'])
-def test_roles_no_flag_bypass(world, role):
+def test_nonconsultants_have_no_matching_flag_bypass(world, role):
     actor = world.user('denied', role)
     actor.is_staff = actor.is_superuser = actor.is_workspace_owner = True
     actor.save()
-    assert client_for(actor).get(FEED).status_code == 403
+    # Daily Tasks now permits personal manual tasks; matching authority is unchanged.
+    assert results(client_for(actor).get(FEED)) == []
+    row = rec(world)
+    assert client_for(actor).get(url(row)).status_code == 403
 
 
 def test_viewer_isolation_and_foreign_detail(world):

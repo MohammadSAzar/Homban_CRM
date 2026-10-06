@@ -770,24 +770,27 @@ Its recipient is the immutable request recipient. It is a durable in-app alert f
 for the Daily Tasks feed, not a generic notification system. Duplicate submissions,
 status changes, opens and system revalidation do not emit another creation event.
 
-Frontend, generic notifications/push/email/SMS, manual reminders,
+Frontend and generic notifications/push/email/SMS,
 visit scheduling, negotiation, commission splitting and collaboration outcome tracking
 remain unimplemented.
 
 ## Daily Tasks / Suggested Program API v1
 
-The consultant-only `GET /api/v1/daily-tasks/` is a read projection over existing
-MatchRecommendation and CollaborationRequest rows, with no DailyTask table. It neither
+The `GET /api/v1/daily-tasks/` endpoint is a role-aware read projection over
+MatchRecommendation, CollaborationRequest and ManualTask rows, with no DailyTask table.
+Consultants receive their own recommendations, participant collaborations and personal
+tasks. Other active customer roles receive only their own ManualTasks. It neither
 scores pairs nor enqueues generation. Recommendation cards expose only the current
 viewer's persisted score, source codes, validity/recommendation/improvement flags and
-status/timestamps. Collaboration cards expose direction, participant professional
+status/Jalali display timestamps. Collaboration cards expose direction, participant professional
 identity, manual status and current validity; source codes are null when invalid.
 Collaboration cards/details/actions never contain scores, thresholds or profiles.
 
-Filters: `type=all|matching|collaboration` (default all) and
-`status=active|new|seen|rejected|done|accepted|expired|all` (default active).
-Matching+accepted and collaboration+done are invalid. Combined done/accepted select only
-the applicable model; rejected selects both. Recommendation active/new/seen require
+Filters: `type=all|matching|collaboration|manual` (default all) and
+`status=active|new|seen|rejected|done|accepted|expired|pending|cancelled|all` (default active).
+Matching+accepted and collaboration+done are invalid. Combined accepted selects only collaborations; rejected selects recommendations and collaborations. Combined done
+includes done recommendations and manual tasks; pending/cancelled select only manual tasks.
+Manual accepts active/pending/done/cancelled/all, rejecting other status combinations. Recommendation active/new/seen require
 current viewer access, valid active sources and currently recommended state. Rejected/done
 are manual history; expired means source/viewer invalid, not merely below threshold.
 Former owners lose all recommendation access immediately, even with status=all.
@@ -795,8 +798,10 @@ Collaboration active requires current validity and new/seen; named manual-status
 include that status independently of validity. Expired selects invalid participant history.
 Invalid collaboration history exposes metadata, never newly unauthorized source details.
 
-Default priority: new incoming collaboration, new recommendation, seen recommendation,
-seen incoming collaboration, sent collaboration, then explicitly requested history.
+Default priority: new incoming collaboration, overdue manual tasks, today manual tasks,
+new recommendations, seen recommendations, seen incoming collaboration, sent collaboration.
+Manual tasks sort by scheduled time ascending then UUID; future days are absent from active
+feed, but remain available through explicit pending/all filters and Calendar.
 Recommendations sort by persisted viewer score descending then UUID; collaborations by
 creation time descending then UUID. A database UNION projects normalized ordering keys,
 counts and slices a 50-item page, then loads only that page's domain rows. No full-history
@@ -835,7 +840,7 @@ reference. Redemption uses the existing score-free CollaborationRequest path, re
 current ownership and deduplicates reverse/repeat requests without a fake recommendation.
 Same-owner rows have no collaboration reference. Preview scores never enter collaboration.
 
-Frontend, manual reminders/calendar, visit scheduling, negotiation/deals, commission,
+Frontend, visit scheduling, negotiation/deals, commission,
 chat and generic push/email/SMS notification delivery remain future work.
 
 ## Pass
@@ -849,12 +854,89 @@ It must preserve:
 
 Do not implement commission calculations until specified.
 
-## Task
-Two conceptual task sources:
-- System-generated recommendation, especially Match
-- User-created reminder/calendar task
+## Manual Tasks / Reminder + Calendar v1
 
-They may share one operational feed without necessarily sharing one persistence model.
+ManualTask is the only persistence concept for personal one-time reminders. Calendar and
+Daily Tasks are projections, not additional task/event models. Fields: UUID, protected
+Workspace and owner, title (required, trimmed API input, maximum 200 characters), canonical
+aware scheduled_for, is_all_day, pending/done/cancelled, created_at, updated_at and nullable
+completed_at. No File/Customer relation, description requirement, recurrence or delivery job.
+Workspace/owner are immutable. Application writes go through transactional services locking
+Workspace -> User -> task. Direct save/update_fields/bulk/delete bypasses are guarded.
+Internal raw SQL remains a maintenance boundary: database checks enforce status/completion
+consistency, while cross-table owner/Workspace validation belongs to model/services.
+
+Only done has completed_at. Entering done sets now; leaving done clears it. All transitions
+are reversible and repeating the same status preserves timestamps. GET never changes a
+ManualTask's status. No hard-delete API exists. Workspace and owner FKs use PROTECT.
+Indexes cover (workspace, owner, status, scheduled_for) and (workspace, owner, scheduled_for)
+for pending feeds and all-status Calendar ranges; UUID breaks time ties.
+
+### Jalali boundary and timezone
+
+**All customer-facing Homban date/calendar presentation is Persian/Jalali. Gregorian dates
+are internal implementation details only.** This applies now to ManualTask, Calendar and
+all Daily Tasks card/detail/action timestamps, including Matching and Collaboration. Raw
+created_at/updated_at/last_evaluated_at values are replaced by corresponding *_display
+fields. Other historical APIs are unchanged until their presentation contracts are revised.
+
+`common/jalali.py` centralizes parsing, conversion, date ranges, local-day boundaries and
+formatting. Dependency `jdatetime==6.1.0` (with jalali-core 1.0.0) supplies calendar conversion,
+leap-year validation and arithmetic; no calendar algorithm is implemented locally.
+See https://pypi.org/project/jdatetime/ . Database datetimes remain canonical and aware;
+no duplicate Jalali strings are persisted. The configured business timezone is settings
+TIME_ZONE (currently Asia/Tehran), independent of request-local timezone activation.
+No user timezone setting is added. Historical nonexistent/ambiguous timed inputs are
+rejected in Persian; all-day boundaries use the earliest real instant of the local day.
+
+Input dates are strictly Jalali YYYY/MM/DD, times HH:MM (24-hour). ASCII, Persian and Arabic
+Indic numerals are accepted and normalized. Machine parsing fields jalali_date/time use
+ASCII digits; date_display and every timestamp *_display use Persian digits. Month names:
+فروردین، اردیبهشت، خرداد، تیر، مرداد، شهریور، مهر، آبان، آذر، دی، بهمن، اسفند.
+Weekdays: شنبه، یکشنبه، دوشنبه، سه‌شنبه، چهارشنبه، پنجشنبه، جمعه.
+Actual weekdays are calculated by the adapter, not inferred from example labels.
+
+Responses expose id/title/status, jalali_date/date_display/weekday/month_name/time,
+is_all_day/is_overdue, created_at_display/updated_at_display/completed_at_display.
+They omit scheduled_for and raw Gregorian/ISO timestamps entirely. For all-day work,
+time is null. Timed tasks require time; all-day input omits time and rejects a supplied time.
+PATCH may preserve existing date/time. Switching timed -> all-day clears the time;
+all-day -> timed requires an explicit time. Title-only PATCH preserves the schedule.
+
+Today is the current business-timezone Jalali day, never UTC's date. Timed pending tasks
+are overdue strictly before now; all-day pending tasks become overdue only once their
+local Jalali day has ended. Completed/cancelled tasks are never overdue. Daily active feed
+includes only pending tasks due today or overdue; future days do not appear there.
+
+### APIs and calendar
+
+- POST/GET `/api/v1/manual-tasks/`
+- GET/PATCH `/api/v1/manual-tasks/<uuid>/`
+- POST `/api/v1/manual-tasks/<uuid>/status/` with status only
+- GET `/api/v1/calendar/tasks/?from=1405/07/01&to=1405/07/30`
+- GET `/api/v1/daily-tasks/manual/<uuid>/`
+- POST `/api/v1/daily-tasks/manual/<uuid>/status/`
+
+Create accepts title, jalali_date, optional time and is_all_day (default false). PATCH accepts
+only those mutable fields. Owner/Workspace/status/timestamps/Gregorian input and unknown
+fields are rejected. List defaults pending; status=all|pending|done|cancelled and optional
+inclusive Jalali from/to bounds are supported. Calendar requires both bounds, defaults all,
+and permits at most 366 inclusive Jalali days. Reversed/invalid/leap-day ranges fail.
+Both return flat task rows inside conventional count/next/previous/results pagination,
+50 per page, scheduled time ascending then UUID. Frontend groups by Jalali date. SQL handles
+range filtering and pagination; the three-way Daily Tasks UNION likewise hydrates only its
+50-row page. No recommendation scoring or generation occurs during list/calendar reads.
+
+### Future frontend contract
+
+Frontend is not implemented. It must use one centralized Jalali utility and one Jalali-aware
+picker, Persian locale/weekdays/months, RTL, Persian display digits and a 24-hour clock.
+Form values use Jalali YYYY/MM/DD. Native Gregorian input type="date", Gregorian grids,
+default JavaScript Date.toLocaleDateString()/weekday rendering, English month/day names,
+ISO strings shown in forms and calendar-type toggles are forbidden. Any JS library must be
+reviewed when the frontend is built; no JS dependencies are added by this backend feature.
+Recurrence, external calendars, push/SMS/email/browser notification delivery and Celery
+reminder delivery remain unimplemented.
 
 ## Deal
 A Deal is historical/business-critical data.

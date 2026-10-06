@@ -34,6 +34,7 @@ LOCAL_APPS = [
     "apps.properties.apps.PropertiesConfig",
     "apps.customers.apps.CustomersConfig",
     "apps.matching.apps.MatchingConfig",
+    "apps.tasks.apps.TasksConfig",
 ]
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS

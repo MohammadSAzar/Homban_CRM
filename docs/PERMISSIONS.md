@@ -384,12 +384,14 @@ but pair details are null and manual actions are denied immediately. Cross-Works
 relationship changes deny the entire response. Restoration preserves recipient status.
 One durable creation event is for the original recipient only; no repeat/restoration spam.
 Daily Tasks reuses this authorization boundary. Frontend, generic notifications, manual
-reminders and visit/negotiation/commission/outcome workflows remain absent.
+visit/negotiation/commission/outcome workflows remain absent; personal reminders are below.
 
 ### Daily Tasks / Suggested Program
-Only active consultants in an active Workspace may use the unified feed/detail/actions.
-Agency/range authority, purchaser ownership and staff/superuser flags never bypass this
-rule. Recommendations use current viewer ownership scope, including historical filters;
+All active customer roles in an active Workspace may use Daily Tasks for their own
+ManualTasks. Only consultants receive Matching/Collaboration items and may use their
+detail/actions. Other roles requesting those feed types receive no items; their detail
+access remains denied. Agency/range authority, purchaser ownership and staff/superuser
+flags never bypass these boundaries. Recommendations use current viewer ownership scope, including historical filters;
 no sibling viewer score, status, profile or breakdown is accessible. Collaboration uses
 original participant scope and current authoritative validity. Invalid participant history
 retains professional identities/status but hides source data and denies response actions.
@@ -406,3 +408,15 @@ scope of Live Matching. Only eligible below-threshold pairs are returned, using 
 restricted representation for owned and cross-owner candidates. No recommendation/work/event
 is created by preview. Signed collaboration references retain the existing expiry, ownership
 fingerprint and current participant revalidation; weak scores are not stored in collaboration.
+
+### ManualTask / Calendar
+Every active authenticated customer role may create/read/edit/change status only on their
+own tasks in their current active Workspace. Hierarchy, purchaser ownership, staff and
+superuser flags grant no access to anyone else's tasks. Workspace-less/internal users are
+denied. Guessed foreign/non-owner UUIDs return not found. Owner and Workspace come from
+current authenticated state under Workspace-first locking and cannot be overridden.
+Manual task status changes use a dedicated strict endpoint; no arbitrary status PATCH or
+delete exists. Calendar/list queries are owner- and Workspace-scoped before date filters.
+Daily manual detail/status reuse these same services, without granting Matching access.
+All timestamps on this surface use the centralized Persian/Jalali display boundary;
+internal canonical datetime storage is never exposed as a calendar display field.

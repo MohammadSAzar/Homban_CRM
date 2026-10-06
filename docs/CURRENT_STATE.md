@@ -502,9 +502,9 @@ foundation uses Django's environment-backed secret as SimpleJWT's default signin
 ## Not yet implemented / not confirmed as implemented
 Treat these as future work unless repository inspection proves otherwise:
 - Full permission framework
-- Manual reminder/calendar task APIs (Daily Tasks projection is implemented below)
+- Recurring reminders / external calendar integration
 - Pass/collaboration workflow
-- Task/calendar
+- Frontend task/calendar components
 - Chat
 - Generic notifications/push/email/SMS (only the collaboration creation event exists)
 - Deals
@@ -685,8 +685,8 @@ Preview creates no recommendation, work or event. Existing signed references ena
 weak-pair collaboration with authoritative revalidation, no persisted score and no fake
 recommendation. Lazy profile initialization in preview/detail does not enqueue generation.
 
-No frontend, manual reminder/calendar, visits, negotiation/deal, commission, chat or generic
-notification delivery is implemented. Existing Matching formulas and schemas are unchanged.
+At this stage no frontend, manual reminder/calendar, visits, negotiation/deal, commission,
+chat or generic notification delivery was included; personal tasks are added below. Existing Matching formulas and schemas are unchanged.
 
 Verification: 69 new focused tests passed (57 Daily Tasks and 12 weak-preview cases),
 including mixed UNION pages, same-score/time UUID ties, historical validity, viewer-score
@@ -697,3 +697,35 @@ full coverage run passed 1,210 tests: 99% overall and 100% statement coverage ac
 use nine queries regardless of page size; recommendation detail uses a constant 46 through
 existing lifecycle validation/locking. Collaboration detail and weak preview also retain
 bounded query counts. Django and migration-drift checks passed; no migration is required.
+
+## Manual Tasks / Reminder + Calendar v1
+
+Added apps.tasks with one ManualTask model and migration tasks/0001_initial.py. Protected
+owner/Workspace, aware schedule, all-day flag, title, reversible pending/done/cancelled
+and completion timestamps form the personal reminder domain. No duplicate CalendarEvent,
+Reminder or DailyTask model, no recurrence, source links or delivery worker were introduced.
+
+ManualTask CRUD-style/status APIs and the inclusive Jalali Calendar projection are owner-only
+for all five active customer roles. Daily Tasks now uses a three-way SQL UNION: consultants
+retain existing recommendation/participant scopes; every other role sees only personal
+manual tasks. Overdue and today tasks appear between new incoming collaboration and new
+recommendations. Page-only hydration, deterministic ties and database pagination remain.
+Matching/Collaboration detail authorization and scoring/lifecycle rules are unchanged.
+
+common/jalali.py is the single conversion/format/range boundary using jdatetime 6.1.0 and
+jalali-core 1.0.0. Inputs are Jalali YYYY/MM/DD and 24-hour HH:MM; normalized ASCII parsing
+fields and Persian-digit display fields are deliberate. All Daily Tasks timestamps, including
+existing recommendation/collaboration cards and details, now use explicit Jalali *_display
+fields. ManualTask/Calendar expose no raw canonical datetime. All-day overdue uses the local
+day boundary in configured Asia/Tehran, not its midnight timestamp or UTC date. Calendar
+requires a range of at most 366 inclusive days and returns flat, paginated rows.
+
+The global product rule and future RTL/Jalali picker/JavaScript contract are documented in
+PRODUCT/DOMAIN. No frontend or JavaScript dependency is added. Recurrence, external calendars,
+notification delivery, visit scheduling and negotiation/deal workflows remain future work.
+
+Verification: all 130 new focused tests passed. The single full regression/coverage run
+passed 1,340 tests with 99% overall coverage. The Jalali adapter, ManualTask model/services
+and Daily Tasks integration modules have 100% statement coverage; task serializers have
+97%. Calendar and mixed-feed query counts remain bounded as fixtures grow. Django check,
+migration-drift check and diff check passed. The only new migration is tasks/0001_initial.py.

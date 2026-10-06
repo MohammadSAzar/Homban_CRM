@@ -5,3 +5,4 @@ django-filter
 python-dotenv
 mysqlclient
 celery[redis]>=5.6,<5.7
+jdatetime==6.1.0

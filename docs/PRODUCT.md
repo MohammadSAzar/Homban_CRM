@@ -174,6 +174,12 @@ Agency manager has primary access and may delegate access to secretary/admin or 
 
 The panel should manage product processes subject to permissions.
 
+## Global date presentation contract
+All customer-facing Homban date/calendar presentation is Persian/Jalali.
+Gregorian dates are internal implementation details only. New or revised presentation
+contracts must use the shared Jalali boundary; historical unrelated APIs are migrated
+when their presentation contract is revised.
+
 ## UX principle
 This is the highest-priority product principle:
 
