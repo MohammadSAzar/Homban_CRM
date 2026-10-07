@@ -49,7 +49,10 @@ def _establish(actor, file, customer, other):
     if created:
         row = CollaborationRequest(property_file=file, customer=customer, requester=actor, recipient=other, participant_a_id=a, participant_b_id=b)
         row.save(_token=_COLLABORATION_WRITE)
-        CollaborationEvent(request=row).save(_token=_COLLABORATION_WRITE)
+        event = CollaborationEvent(request=row)
+        event.save(_token=_COLLABORATION_WRITE)
+        from apps.notifications.producers import collaboration_notification
+        collaboration_notification(event)
     else:
         row.property_file, row.customer = file, customer
         row.requester, row.recipient = (actor, other) if row.requester_id == actor.pk else (other, actor)

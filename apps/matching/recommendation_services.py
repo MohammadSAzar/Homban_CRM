@@ -60,6 +60,7 @@ def _association_valid(viewer, file, customer):
 
 def _apply_evaluation(row, result, *, source_valid, change, persist=True, reactivate=True):
     """Private sink: caller has evaluated fresh locked sources with the viewer's base profile."""
+    was_new, previous_status = row._state.adding, row.user_status
     was_expired = not row.is_source_valid
     if reactivate and result.recommended and row.user_status in (row.Status.REJECTED, row.Status.DONE):
         if change.material_inputs_changed or change.sources_became_operational or was_expired:
@@ -71,8 +72,12 @@ def _apply_evaluation(row, result, *, source_valid, change, persist=True, reacti
     row.minimum_score = result.minimum_score
     row.formula_version = result.formula_version
     row.last_evaluated_at = timezone.now()
+    row._notification_event = ('created' if was_new else 'reactivated'
+        if previous_status in (row.Status.REJECTED, row.Status.DONE) and row.user_status == row.Status.NEW else None)
     if persist:
         row.save(_token=_LIFECYCLE_WRITE)
+        from apps.notifications.producers import recommendation_notification
+        recommendation_notification(row, row._notification_event)
     return row
 
 

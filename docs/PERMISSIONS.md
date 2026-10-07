@@ -383,8 +383,8 @@ to another consultant's operational detail API. On reassignment/inactivity, hist
 but pair details are null and manual actions are denied immediately. Cross-Workspace
 relationship changes deny the entire response. Restoration preserves recipient status.
 One durable creation event is for the original recipient only; no repeat/restoration spam.
-Daily Tasks reuses this authorization boundary. Frontend, generic notifications, manual
-visit/negotiation/commission/outcome workflows remain absent; personal reminders are below.
+Daily Tasks reuses this authorization boundary. Frontend, external notification delivery and
+visit/negotiation/commission/outcome workflows remain absent; personal reminders and in-app notifications are below.
 
 ### Daily Tasks / Suggested Program
 All active customer roles in an active Workspace may use Daily Tasks for their own
@@ -420,3 +420,17 @@ delete exists. Calendar/list queries are owner- and Workspace-scoped before date
 Daily manual detail/status reuse these same services, without granting Matching access.
 All timestamps on this surface use the centralized Persian/Jalali display boundary;
 internal canonical datetime storage is never exposed as a calendar display field.
+
+### Notification Center
+All five active customer roles may list/retrieve/count and mark read/unread only their own
+notifications in their current active Workspace. Workspace-less/internal users are denied.
+Agency/Range hierarchy, purchaser ownership, staff and superuser flags grant no bypass.
+Guessed foreign/non-recipient UUIDs return not found. Read-all is recipient/Workspace scoped.
+No customer creation, editing, delete or archive endpoint exists. Domain producers alone
+publish; recipient state is authoritatively rechecked under Workspace-first locking.
+
+Persisted summaries are intentionally generic, without contacts, notes, addresses, media,
+scores, profiles or other-owner identity. No source objects are loaded in notification reads.
+A link grants no source access: the target endpoint revalidates current operational/viewer/
+participant authorization. Notification read state is independent of source seen/status.
+All dates use the shared Persian/Jalali boundary; event keys and internal ownership are hidden.

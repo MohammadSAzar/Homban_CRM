@@ -770,7 +770,7 @@ Its recipient is the immutable request recipient. It is a durable in-app alert f
 for the Daily Tasks feed, not a generic notification system. Duplicate submissions,
 status changes, opens and system revalidation do not emit another creation event.
 
-Frontend and generic notifications/push/email/SMS,
+Frontend and external push/email/SMS delivery,
 visit scheduling, negotiation, commission splitting and collaboration outcome tracking
 remain unimplemented.
 
@@ -970,3 +970,75 @@ Future external-import flow:
 External source -> fetch/discover -> normalize -> stage -> consultant review -> approve/reject -> internal region mapping -> file creation/update.
 
 Do not directly trust external source fields as internal canonical values.
+
+## Notification Center v1
+
+`apps.notifications.Notification` is the shared personal in-app event summary, separate
+from Daily Tasks and source-domain state. UUID, protected Workspace/recipient, kind,
+Persian title/message, safe internal action_url, optional source_type/source_id, event_key,
+nullable read_at and canonical created_at are the only stored fields. No payload JSON,
+score, profile settings, contact, address, notes or media are copied. Source metadata is
+not a GenericForeignKey and reads never load source objects. Existing deep-link endpoints
+remain responsible for current source authorization, including reassignment.
+
+Kinds: match_recommendation and collaboration_request have producers. chat_message,
+import_review and voice_review are reserved valid service values, with no such producers.
+`publish_notification` is the one trusted internal publication entry point; it derives
+Workspace from a reloaded recipient under Workspace -> User locks. Inactive, moved or
+workspace-less recipients cause a no-op `(None, False)`, never manager fallback.
+Customer requests cannot publish, select recipients or change event content.
+
+The database enforces unique (recipient, event_key) and valid kind. Workspace consistency,
+field lengths, immutable summary/reference fields and internal path validation are checked
+in the service/model. URLs accept only slash-delimited internal route segments, no external
+host, query/fragment, encoded slash, dot traversal or scripts. Normal direct/partial/bulk
+writes and deletion are guarded; trusted base QuerySet/raw SQL maintenance is outside
+application guarantees. Recipient/Workspace history uses PROTECT.
+
+Publication and the authoritative source transition commit in the SAME transaction.
+An insertion failure rolls back the source transition (and generation cursor); the existing
+background retry/recovery can retry the whole operation. There is no notification queue,
+outbox, delivery worker or GET-time repair scan. Workspace serialization plus the unique
+DB key makes concurrent normal duplicate publication return one row and one created flag.
+First publication wins: retry does not replace content or reset read state.
+
+Recommendation creation publishes once to its viewer. Only the existing lifecycle's actual
+rejected/done -> new reactivation publishes again. The shared lifecycle marks that transition;
+generation publishes after its batch write with the durable work ID in the event key.
+Direct single-pair lifecycle commands use the persisted last_evaluated_at transition marker,
+not a fresh publication timestamp. Created events use a fixed recommendation-ID key. No new
+reactivation definition, score-change inference or recommendation counter is introduced.
+Ordinary evaluation, seen score improvement, detail opens and manual actions emit nothing.
+Two owner-viewers retain independent notifications, never sibling scores or identities.
+Batch publication stays within existing 25-pair/50-viewer bounds; ordinary refreshes add no
+notification queries. Notification insertion is synchronous within the background chunk.
+
+Collaboration publication bridges the existing one-time CollaborationEvent in the creation
+transaction, keyed by request ID + created. Only the original recipient is notified. Duplicate,
+reverse, status/open and restoration paths do not emit events or notifications. Text is generic
+Persian and contains neither requester contacts nor source details. No second event lifecycle
+is introduced. Historical events are not backfilled by GET or this schema migration.
+
+Read state is only read_at: null means unread. Explicit read/unread commands are reversible
+and same-state idempotent. Read-all updates only the locked recipient's currently unread rows
+in one SQL UPDATE and reports affected_count. Reading a notification never marks a source
+seen, and opening a source never marks its notification read. Notifications are not inserted
+into Daily Tasks, and the two unread/action counts are intentionally independent.
+
+Endpoints:
+- GET `/api/v1/notifications/`: status=unread (default), read or all; optional kind; page.
+- GET `/api/v1/notifications/<uuid>/`: no mutation.
+- POST `/api/v1/notifications/<uuid>/read/`: empty object.
+- POST `/api/v1/notifications/<uuid>/unread/`: empty object.
+- POST `/api/v1/notifications/read-all/`: empty object, no optional kind filter in v1.
+- GET `/api/v1/notifications/unread-count/`: efficient COUNT, no source loading.
+
+List ordering is created_at descending then UUID descending, DB-paginated at 50.
+Indexes cover recipient/read_at/created_at and recipient/kind/created_at; the unique key
+also begins with recipient. API output contains id/kind/title/message/action_url/is_read,
+created_at_display, created_date, created_time and read_at_display using common.jalali.
+No raw canonical dates, event keys, recipient/Workspace internals or source payload appear.
+Jalali dates, Persian display names/digits and 24-hour time reuse the centralized adapter.
+
+Chat, push/email/SMS, device tokens, delivery receipts, preferences/quiet hours, broadcasts,
+importer/crawler, voice review, Draft/Staging and Deal workflows are not implemented here.

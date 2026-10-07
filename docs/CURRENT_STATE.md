@@ -506,7 +506,7 @@ Treat these as future work unless repository inspection proves otherwise:
 - Pass/collaboration workflow
 - Frontend task/calendar components
 - Chat
-- Generic notifications/push/email/SMS (only the collaboration creation event exists)
+- External notification delivery: push/email/SMS (in-app Notification Center is implemented below)
 - Deals
 - External import workers
 - Voice/AI creation
@@ -729,3 +729,30 @@ passed 1,340 tests with 99% overall coverage. The Jalali adapter, ManualTask mod
 and Daily Tasks integration modules have 100% statement coverage; task serializers have
 97%. Calendar and mixed-feed query counts remain bounded as fixtures grow. Django check,
 migration-drift check and diff check passed. The only new migration is tasks/0001_initial.py.
+
+## Notification Center v1
+
+Added apps.notifications and notifications/0001_initial.py with one personal Notification
+model. Protected recipient/Workspace, immutable summary/source metadata, recipient-event
+uniqueness, valid-kind DB check and read/filter indexes support shared in-app publication.
+Matching and Collaboration are the only producers; chat/import/voice kinds are extension
+points without producer implementation. No extra Celery jobs or delivery infrastructure.
+
+Authoritative recommendation creation/reactivation and CollaborationEvent creation publish
+atomically with the source transaction. Retry keys use the existing lifecycle transition /
+generation watermark; duplicate refresh/open/status changes do not create alerts. Inactive
+recipients are skipped. Notification read/unread and source statuses remain independent.
+API list/detail/read/unread/read-all/unread-count are personal for all active customer roles,
+with strict inputs, newest-first 50-row pagination, bounded queries and centralized Jalali
+output. Source details/contacts/scores/profiles never enter notification summaries or API.
+
+Chat, push/email/SMS, device tokens, preferences, broadcasts, importer/crawler, voice review,
+Draft/Staging, frontend and Deal workflow remain outside this feature. Apply the new schema
+migration before running the updated web/worker code; no historical notification backfill.
+
+Verification: 70 focused Notification tests passed (54 model/service/API and 16 producer
+integration cases), including real MySQL duplicate publication, transaction rollback, privacy,
+Jalali output and constant list/count queries. All 368 affected unchanged regressions passed.
+The single full coverage run passed 1,410 tests, with 99% overall coverage and 100% statement
+coverage across Notification production modules. Django, migration-drift and diff checks
+passed. Only notifications/0001_initial.py adds schema; existing migrations are unchanged.

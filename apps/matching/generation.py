@@ -155,6 +155,10 @@ def _refresh_batch(work, identities):
         raw.bulk_create(inserts, batch_size=BATCH_SIZE * 2)
     if updates:
         raw.bulk_update(updates, WRITE_FIELDS, batch_size=BATCH_SIZE * 2)
+    # Same transaction as projection/cursor writes; retries cannot leave orphan alerts.
+    from apps.notifications.producers import recommendation_notification
+    for row in inserts + updates:
+        recommendation_notification(row, getattr(row, '_notification_event', None), watermark=work.pk)
 
 
 @transaction.atomic
