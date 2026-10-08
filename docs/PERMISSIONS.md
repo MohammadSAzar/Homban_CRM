@@ -434,3 +434,16 @@ scores, profiles or other-owner identity. No source objects are loaded in notifi
 A link grants no source access: the target endpoint revalidates current operational/viewer/
 participant authorization. Notification read state is independent of source seen/status.
 All dates use the shared Persian/Jalali boundary; event keys and internal ownership are hidden.
+
+### Private Chat Phase 1
+All five active customer roles may open private conversations with another active user in
+the same active Workspace. Only the two current participants may list/read/send/mark read.
+Agency/Range hierarchy, workspace ownership, staff and superuser confer no bypass.
+Workspace-less users are denied; foreign, unrelated, or no-longer-valid conversation UUIDs
+return not found. Both participant Workspace memberships and active states are checked on
+every access. Deactivation/reassignment hides retained history rather than deleting it.
+Clients cannot choose Workspace, sender, canonical participant slots, read markers or dates.
+GET is non-mutating; explicit read changes only the caller's marker. No edit/delete exists.
+Only approved professional identity and private chat content are returned to participants;
+no phone/security/CRM fields. Generic recipient-only notifications omit message content and
+reuse the existing independent read lifecycle. Chat dates use centralized Jalali presentation.

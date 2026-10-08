@@ -981,8 +981,8 @@ score, profile settings, contact, address, notes or media are copied. Source met
 not a GenericForeignKey and reads never load source objects. Existing deep-link endpoints
 remain responsible for current source authorization, including reassignment.
 
-Kinds: match_recommendation and collaboration_request have producers. chat_message,
-import_review and voice_review are reserved valid service values, with no such producers.
+Kinds: match_recommendation, collaboration_request and chat_message have producers.
+import_review and voice_review remain reserved service values without producers.
 `publish_notification` is the one trusted internal publication entry point; it derives
 Workspace from a reloaded recipient under Workspace -> User locks. Inactive, moved or
 workspace-less recipients cause a no-op `(None, False)`, never manager fallback.
@@ -1042,3 +1042,50 @@ Jalali dates, Persian display names/digits and 24-hour time reuse the centralize
 
 Chat, push/email/SMS, device tokens, delivery receipts, preferences/quiet hours, broadcasts,
 importer/crawler, voice review, Draft/Staging and Deal workflows are not implemented here.
+
+## Internal Chat Phase 1 — private text conversations
+
+`apps.chat` adds Conversation and Message only. A Conversation has a UUID, protected
+Workspace and two protected, distinct User references in canonical UUID order, two nullable
+read timestamps, and creation/activity timestamps. Database pair uniqueness and ordered-pair
+checks back Workspace-first transactions: opposite-direction creation returns the same row.
+All five active customer roles may participate; both users must remain active in the same
+active Workspace. Inactive/moved participants make the conversation inaccessible without
+deleting history. Restoration of valid participant state exposes that same history again.
+
+Messages have UUID, protected Conversation/sender, plain text and an aware created_at.
+Text is trimmed and must contain 1–4,000 characters. No edits/deletes or media content exist.
+Services derive sender and Workspace, revalidate current participants and write atomically.
+Normal direct/bulk writes are guarded; raw SQL/base QuerySet maintenance remains trusted
+and outside service guarantees. References are immutable and history is protected.
+
+Endpoints:
+- GET/POST `/api/v1/chat/conversations/`; POST accepts only participant_id.
+- GET `/api/v1/chat/conversations/<uuid>/`.
+- GET/POST `/api/v1/chat/conversations/<uuid>/messages/`; POST accepts only text.
+- POST `/api/v1/chat/conversations/<uuid>/read/`; empty object.
+
+GET never advances read state. Explicit read records the current last-message timestamp
+for only the caller; repeat reads are idempotent and do not reorder the conversation.
+Unread counts exclude the caller's own messages. Sending does not mark earlier received
+messages read. Under the Workspace lock, message times increase strictly (one microsecond
+past the preceding message on a clock tie/rollback), so later sends cannot fall behind a
+read watermark. There are no per-message receipts or public read ticks.
+
+Conversation lists order activity descending then UUID ascending; history orders oldest
+first by created_at then UUID. Both use database page-number pagination at 50. List rows
+join participant identities and use correlated latest-message/unread subqueries, not
+per-conversation queries. Preview is at most 120 characters. Professional identity exposes
+only id/username/first_name/last_name/role. All display times use common.jalali; no canonical
+Gregorian timestamps or read markers are returned.
+
+Each successfully created Message publishes one generic Persian chat_message Notification
+to the other participant in the SAME transaction, keyed `chat-message:<message-id>:created`.
+The existing publish_notification service deduplicates retries for that message. No message
+body, phone or CRM data is copied. The internal link targets the authorized conversation.
+A repeated send POST represents a new Message; notification retry is not send deduplication.
+Chat read state and Notification read state are independent in both directions.
+
+Not implemented: realtime/WebSocket, presence, typing, media/voice/files, reactions,
+edit/delete, forwarding, group chat, announcement channels, search, pins, mute/archive,
+blocking, external users or push/email/SMS. No transport or future media schema is added.

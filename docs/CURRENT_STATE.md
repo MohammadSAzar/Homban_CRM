@@ -505,7 +505,7 @@ Treat these as future work unless repository inspection proves otherwise:
 - Recurring reminders / external calendar integration
 - Pass/collaboration workflow
 - Frontend task/calendar components
-- Chat
+- Chat realtime/media/groups (private text Phase 1 is implemented below)
 - External notification delivery: push/email/SMS (in-app Notification Center is implemented below)
 - Deals
 - External import workers
@@ -735,7 +735,7 @@ migration-drift check and diff check passed. The only new migration is tasks/000
 Added apps.notifications and notifications/0001_initial.py with one personal Notification
 model. Protected recipient/Workspace, immutable summary/source metadata, recipient-event
 uniqueness, valid-kind DB check and read/filter indexes support shared in-app publication.
-Matching and Collaboration are the only producers; chat/import/voice kinds are extension
+Matching, Collaboration and private Chat are producers; import/voice kinds are extension
 points without producer implementation. No extra Celery jobs or delivery infrastructure.
 
 Authoritative recommendation creation/reactivation and CollaborationEvent creation publish
@@ -756,3 +756,27 @@ Jalali output and constant list/count queries. All 368 affected unchanged regres
 The single full coverage run passed 1,410 tests, with 99% overall coverage and 100% statement
 coverage across Notification production modules. Django, migration-drift and diff checks
 passed. Only notifications/0001_initial.py adds schema; existing migrations are unchanged.
+
+## Internal Chat Phase 1
+
+`apps.chat` implements same-Workspace private two-user conversations and text messages.
+Migration chat/0001_initial.py contains only these models, protected references, pair/text
+constraints and participant-activity/message-history indexes. Workspace-first transactions
+and canonical UUID ordering prevent reverse duplicates. No existing model/schema changes.
+Conversation list/create/detail, message history/send and explicit read routes live under
+`/api/v1/chat/conversations/`. All active customer roles have participant-only access without
+hierarchy/owner/staff bypass. Both participants' current membership/activity are required.
+Two read watermarks replace per-message receipts; GET is non-mutating, and history remains
+append-only. Lists/history paginate at 50; joined identities and correlated unread/latest
+subqueries keep list query counts constant. Common Jalali formatting supplies all timestamps.
+Text-message creation atomically publishes a generic deduplicated recipient notification;
+no message body is copied and Notification read state remains independent.
+No realtime, presence, typing, media, voice/files, reactions, edit/delete, groups/channels,
+search, mute/archive, frontend or delivery-channel infrastructure is implemented.
+
+Verification: 43 focused Chat tests and 70 unchanged Notification tests passed together.
+Chat and Notification production modules have 100% statement coverage. The single full
+regression run passed 1,453 tests. Real MySQL reverse-creation concurrency, strict inputs,
+current participant privacy, read watermark clock ties, notification rollback/deduplication,
+Jalali output, 50-row pagination and constant list query counts are covered. Django check,
+migration-drift check and diff check passed. Apply chat/0001_initial.py before deployment.

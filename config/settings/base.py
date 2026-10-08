@@ -36,6 +36,7 @@ LOCAL_APPS = [
     "apps.matching.apps.MatchingConfig",
     "apps.tasks.apps.TasksConfig",
     "apps.notifications.apps.NotificationsConfig",
+    "apps.chat.apps.ChatConfig",
 ]
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
