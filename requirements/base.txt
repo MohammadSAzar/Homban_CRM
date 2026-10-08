@@ -6,3 +6,5 @@ python-dotenv
 mysqlclient
 celery[redis]>=5.6,<5.7
 jdatetime==6.1.0
+channels>=4.3,<4.4
+channels-redis>=4.3,<4.4

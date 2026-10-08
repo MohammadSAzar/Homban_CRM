@@ -447,3 +447,14 @@ GET is non-mutating; explicit read changes only the caller's marker. No edit/del
 Only approved professional identity and private chat content are returned to participants;
 no phone/security/CRM fields. Generic recipient-only notifications omit message content and
 reuse the existing independent read lifecycle. Chat dates use centralized Jalali presentation.
+
+### Chat realtime delivery
+The authenticated empty-body realtime-ticket POST reuses exactly the private Conversation
+scope. A signed 90-second ticket selects only its issuing user, Workspace and Conversation;
+it grants no hierarchy/owner/staff bypass. Browser origins require explicit allowlisting.
+Connect and each delivered event recheck current database authorization through Chat services.
+Inactive/moved users or invalid participants receive no Message payload. Only Message IDs
+travel through the internal group; authorized sockets receive the existing allowlisted Chat
+message representation, including text and Jalali display time. No JWT travels in the URL.
+Tickets are short-lived bearer credentials, so WebSocket query strings must not enter logs.
+The socket accepts no write/read-state commands. Notifications and read markers are unchanged.

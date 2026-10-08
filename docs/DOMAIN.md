@@ -1089,3 +1089,51 @@ Chat read state and Notification read state are independent in both directions.
 Not implemented: realtime/WebSocket, presence, typing, media/voice/files, reactions,
 edit/delete, forwarding, group chat, announcement channels, search, pins, mute/archive,
 blocking, external users or push/email/SMS. No transport or future media schema is added.
+
+## Internal Chat Phase 2A — realtime delivery
+
+REST remains the only authoritative Message write path. POST an empty object to
+`/api/v1/chat/conversations/<uuid>/realtime-ticket/` using normal customer JWT authentication.
+The no-store response contains a signed 90-second bearer ticket bound to user UUID,
+Workspace UUID and Conversation UUID, with no JWT, contacts or message data. The ticket
+is reusable during its short handshake lifetime (not a persisted/one-time token).
+Connect to `/ws/chat/conversations/<uuid>/?ticket=<ticket>` over WSS. Treat the ticket as
+a short-lived credential; deployment access logs must redact WebSocket query strings.
+Never place the API JWT in the WebSocket URL. TLS and an explicit origin allowlist are
+deployment requirements. Invalid credentials and inaccessible Conversations fail closed.
+
+Channels routes only Chat WebSockets alongside the existing Django HTTP ASGI application;
+WSGI is unchanged. Set CHAT_WEBSOCKET_ORIGINS to comma-separated exact browser origins,
+including scheme and port; empty denies all. Non-test channel layers use channels_redis
+with CHAT_REDIS_URL, falling back to the existing environment-backed CELERY_BROKER_URL,
+and a separate homban-chat key prefix. No credentials are stored in code. Run the ASGI
+application with a WebSocket-capable ASGI server and Redis; deployment itself is not part
+of this feature. Tests use an isolated in-memory layer and do not require Redis.
+
+Each socket joins only its authorized Conversation group. Ticket claims are rechecked
+against current active user/Workspace/participant state through existing Chat services.
+Each event repeats that authorization before loading/serializing its Message; revoked
+connections close without receiving message data. Ticket expiry limits new connections;
+an existing socket stays usable only while its current participant authorization holds.
+Disconnect removes group membership. Client text/binary frames close with policy violation;
+they never send Messages or mark anything read.
+
+The existing send service registers one fanout callback after its OUTERMOST transaction
+commits. Rollback emits nothing. Redis carries only Conversation/Message IDs. Authorized
+sockets receive `type: chat.message`, conversation_id, and the existing message representation:
+id, text, viewer-specific is_own and Jalali created_at_display. Both participants/tabs may
+receive it; no separate sender profile or private fields are introduced. Message and
+Notification insertion still occurs exactly once in the original REST transaction.
+Realtime receipt neither advances Chat read watermarks nor reads Notifications.
+
+Delivery is best effort, without durable replay, delivery acknowledgement or an outbox.
+Redis connection/timeouts are logged without body/ticket data; unexpected callback errors
+are logged with tracebacks by Django's robust on_commit handling. Neither makes an already
+committed send appear unsuccessful. Clients must recover missed events using paginated
+REST history, reconcile by Message UUID, and order by canonical history rather than assume
+network arrival order. No guarantee of delivery during disconnects or process failure.
+
+Dependencies added: channels 4.3.2, channels-redis 4.3.0 and its msgpack 1.2.3 dependency;
+existing Redis/Django dependencies are unchanged. No schema migration. WebSocket sending,
+typing, presence, receipts, media/voice/files, reactions, groups and announcement channels
+remain unimplemented. No frontend or additional Notification producer is introduced.

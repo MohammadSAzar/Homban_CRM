@@ -101,6 +101,8 @@ def send_message(*, actor, pk, text):
     row.save(_token=_CHAT_WRITE)
     recipient = row.participant_b if actor.pk == row.participant_a_id else row.participant_a
     notify_message(message, recipient)
+    from .realtime import schedule_message
+    schedule_message(message)
     return message
 
 

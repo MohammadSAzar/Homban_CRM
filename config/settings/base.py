@@ -165,3 +165,14 @@ CELERY_BROKER_TRANSPORT_OPTIONS = {"socket_connect_timeout": 1, "socket_timeout"
 CELERY_TASK_SERIALIZER = "json"
 CELERY_ACCEPT_CONTENT = ["json"]
 
+# Separate channel prefix; reuse the environment-backed broker URL unless overridden.
+ASGI_APPLICATION = 'config.asgi.application'
+CHANNEL_LAYERS = {'default': {
+    'BACKEND': 'channels_redis.core.RedisChannelLayer',
+    'CONFIG': {'hosts': [os.environ.get('CHAT_REDIS_URL', CELERY_BROKER_URL)],
+               'prefix': 'homban-chat'},
+}}
+# Exact browser origins including scheme/port. Empty means deny all WebSocket origins.
+CHAT_WEBSOCKET_ORIGINS = [value.strip() for value in
+    os.environ.get('CHAT_WEBSOCKET_ORIGINS', '').split(',') if value.strip()]
+

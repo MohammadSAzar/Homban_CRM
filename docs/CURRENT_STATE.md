@@ -780,3 +780,22 @@ regression run passed 1,453 tests. Real MySQL reverse-creation concurrency, stri
 current participant privacy, read watermark clock ties, notification rollback/deduplication,
 Jalali output, 50-row pagination and constant list query counts are covered. Django check,
 migration-drift check and diff check passed. Apply chat/0001_initial.py before deployment.
+
+## Internal Chat Phase 2A — realtime delivery
+
+Added Channels/Redis transport without models or migrations. POST
+`/api/v1/chat/conversations/<uuid>/realtime-ticket/` issues a no-store, signed 90-second
+user/Workspace/Conversation-bound ticket. `/ws/chat/conversations/<uuid>/?ticket=...`
+subscribes only to that authorized Conversation. Explicit browser origin configuration is
+required; connect and every outbound Message recheck current participant access. HTTP ASGI
+and WSGI behavior are preserved. Client WebSocket frames cannot create Messages.
+
+REST send remains authoritative and schedules one robust on_commit ID-only group event.
+Each authorized participant receives existing Chat message_data (text, id, is_own,
+Jalali created_at_display). Redis failures are logged; durable Messages/Notifications remain
+successful. Delivery is best effort; reconnect recovery uses REST history, not a replay queue.
+Read markers and Notification lifecycle remain independent. See DOMAIN for deployment,
+origin/ticket handling and CHAT_REDIS_URL settings. Test channel layers are in-memory only.
+Only channels/channels-redis/msgpack dependencies were added; existing versions unchanged.
+No WebSocket sending, typing, presence, receipts, media/voice/files, reactions, groups,
+announcement channels, frontend or push delivery is implemented.

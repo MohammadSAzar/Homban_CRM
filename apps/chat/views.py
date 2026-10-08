@@ -70,3 +70,13 @@ class ConversationReadView(APIView):
         validate(EmptySerializer, request.data)
         row = mark_conversation_read(actor=request.user, pk=pk)
         return Response(conversation_data(summaries(request.user).get(pk=row.pk), request.user))
+
+
+class RealtimeTicketView(APIView):
+    def post(self, request, pk):
+        from .realtime import create_ticket
+        validate(EmptySerializer, request.query_params.dict())
+        validate(EmptySerializer, request.data)
+        response = Response({'ticket': create_ticket(actor=request.user, pk=pk)})
+        response['Cache-Control'] = 'no-store'
+        return response
