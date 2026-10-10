@@ -788,14 +788,23 @@ Added Channels/Redis transport without models or migrations. POST
 user/Workspace/Conversation-bound ticket. `/ws/chat/conversations/<uuid>/?ticket=...`
 subscribes only to that authorized Conversation. Explicit browser origin configuration is
 required; connect and every outbound Message recheck current participant access. HTTP ASGI
-and WSGI behavior are preserved. Client WebSocket frames cannot create Messages.
+and WSGI behavior are preserved. Phase 2B adds text sending as described below.
 
-REST send remains authoritative and schedules one robust on_commit ID-only group event.
+The shared send service schedules one robust on_commit ID-only group event.
 Each authorized participant receives existing Chat message_data (text, id, is_own,
 Jalali created_at_display). Redis failures are logged; durable Messages/Notifications remain
 successful. Delivery is best effort; reconnect recovery uses REST history, not a replay queue.
 Read markers and Notification lifecycle remain independent. See DOMAIN for deployment,
 origin/ticket handling and CHAT_REDIS_URL settings. Test channel layers are in-memory only.
 Only channels/channels-redis/msgpack dependencies were added; existing versions unchanged.
-No WebSocket sending, typing, presence, receipts, media/voice/files, reactions, groups,
+No typing, presence, receipts, media/voice/files, reactions, groups,
 announcement channels, frontend or push delivery is implemented.
+
+### Phase 2B — WebSocket send path
+
+`chat.send` accepts text only and delegates through a database bridge to the unchanged
+REST `send_message` service with current authorization revalidation. A `chat.send.ack`
+returns the Message UUID after commit; the existing `chat.message` event remains the sole
+full realtime representation. Safe Persian errors preserve valid connections; revoked
+access closes them. Notification publication, Jalali output and read state are unchanged.
+No schema, dependency, additional notification producer or new read semantics were added.

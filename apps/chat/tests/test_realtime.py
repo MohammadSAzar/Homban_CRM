@@ -195,13 +195,17 @@ def test_rollback_and_outer_commit_boundary(setup):
 
 
 @pytest.mark.parametrize('binary', [False, True])
-def test_websocket_cannot_write(setup, binary):
+def test_unsupported_frames_cannot_write(setup, binary):
     people, row, app = setup
     value = ticket(people.owner, row)
     async def run():
         async with socket(app, row, value) as (ws, _):
             await ws.send_input({'type': 'websocket.receive', 'bytes' if binary else 'text': b'hi' if binary else '{"text":"hi"}'})
-            assert (await ws.receive_output())['code'] == 1008
+            response = await ws.receive_output()
+            if binary:
+                assert response['code'] == 1008
+            else:
+                assert json.loads(response['text'])['type'] == 'chat.error'
     async_to_sync(run)()
     assert not Message.objects.exists() and not Notification.objects.exists()
 

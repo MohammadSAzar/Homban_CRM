@@ -1092,7 +1092,7 @@ blocking, external users or push/email/SMS. No transport or future media schema 
 
 ## Internal Chat Phase 2A — realtime delivery
 
-REST remains the only authoritative Message write path. POST an empty object to
+The shared Chat send service is the authoritative Message write path. POST an empty object to
 `/api/v1/chat/conversations/<uuid>/realtime-ticket/` using normal customer JWT authentication.
 The no-store response contains a signed 90-second bearer ticket bound to user UUID,
 Workspace UUID and Conversation UUID, with no JWT, contacts or message data. The ticket
@@ -1115,15 +1115,15 @@ against current active user/Workspace/participant state through existing Chat se
 Each event repeats that authorization before loading/serializing its Message; revoked
 connections close without receiving message data. Ticket expiry limits new connections;
 an existing socket stays usable only while its current participant authorization holds.
-Disconnect removes group membership. Client text/binary frames close with policy violation;
-they never send Messages or mark anything read.
+Disconnect removes group membership. Binary frames close with policy violation;
+text sends follow Phase 2B below. Socket activity never marks anything read.
 
 The existing send service registers one fanout callback after its OUTERMOST transaction
 commits. Rollback emits nothing. Redis carries only Conversation/Message IDs. Authorized
 sockets receive `type: chat.message`, conversation_id, and the existing message representation:
 id, text, viewer-specific is_own and Jalali created_at_display. Both participants/tabs may
 receive it; no separate sender profile or private fields are introduced. Message and
-Notification insertion still occurs exactly once in the original REST transaction.
+Notification insertion still occurs exactly once in the shared service transaction.
 Realtime receipt neither advances Chat read watermarks nor reads Notifications.
 
 Delivery is best effort, without durable replay, delivery acknowledgement or an outbox.
@@ -1134,6 +1134,19 @@ REST history, reconcile by Message UUID, and order by canonical history rather t
 network arrival order. No guarantee of delivery during disconnects or process failure.
 
 Dependencies added: channels 4.3.2, channels-redis 4.3.0 and its msgpack 1.2.3 dependency;
-existing Redis/Django dependencies are unchanged. No schema migration. WebSocket sending,
-typing, presence, receipts, media/voice/files, reactions, groups and announcement channels
+existing Redis/Django dependencies are unchanged. No schema migration. Typing,
+presence, receipts, media/voice/files, reactions, groups and announcement channels
 remain unimplemented. No frontend or additional Notification producer is introduced.
+
+### Phase 2B — WebSocket text sending
+
+The authorized socket accepts exactly `{"type":"chat.send","text":"سلام"}`.
+REST and WebSocket both use `send_message`; a synchronous database bridge rechecks current
+user, Workspace and participant access before invoking it. No client ownership fields are
+accepted. Existing text validation, Notification publication and after-commit fanout apply.
+After durable creation, `chat.send.ack` contains only `message_id`; it acknowledges the send,
+not recipient delivery or reading. The authoritative payload remains `chat.message`.
+Invalid input returns Persian `chat.error` with `invalid_message` or `unsupported_command`
+and leaves the socket open. Unexpected service failures are logged and return `send_failed`
+without internal details; revoked authorization closes with 4403. Read state is unchanged.
+There is no retry deduplication key: each successful send command creates one Message.

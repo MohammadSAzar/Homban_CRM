@@ -12,7 +12,7 @@ from rest_framework.exceptions import NotFound, PermissionDenied
 from apps.accounts.models import User
 from .models import Message
 from .serializers import message_data
-from .services import lock_actor, owned_conversation
+from .services import lock_actor, owned_conversation, send_message
 
 logger = logging.getLogger(__name__)
 TICKET_SALT = 'homban.chat.websocket.v1'
@@ -59,6 +59,13 @@ def can_connect(claims):
     except (PermissionDenied, NotFound):
         return False
     return True
+
+
+@transaction.atomic
+def send_command(claims, text):
+    """Bind transport claims to current state; the shared service owns all writes."""
+    actor = authorized_actor(claims)
+    return send_message(actor=actor, pk=claims['conversation'], text=text).pk
 
 
 @transaction.atomic

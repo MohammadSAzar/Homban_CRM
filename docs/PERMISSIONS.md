@@ -457,4 +457,7 @@ Inactive/moved users or invalid participants receive no Message payload. Only Me
 travel through the internal group; authorized sockets receive the existing allowlisted Chat
 message representation, including text and Jalali display time. No JWT travels in the URL.
 Tickets are short-lived bearer credentials, so WebSocket query strings must not enter logs.
-The socket accepts no write/read-state commands. Notifications and read markers are unchanged.
+The socket accepts only `chat.send` text commands, using the same authoritative service as
+REST. Every send rechecks current user/Workspace/participant access; clients cannot choose
+sender or Conversation. No hierarchy bypass or read-state commands exist. ACK confirms
+durable creation only; Notification behavior and read markers are unchanged.
