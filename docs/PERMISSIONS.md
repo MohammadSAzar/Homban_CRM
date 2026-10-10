@@ -461,3 +461,12 @@ The socket accepts only `chat.send` text commands, using the same authoritative 
 REST. Every send rechecks current user/Workspace/participant access; clients cannot choose
 sender or Conversation. No hierarchy bypass or read-state commands exist. ACK confirms
 durable creation only; Notification behavior and read markers are unchanged.
+
+### Chat image/file attachments
+REST uploads use the same current participant authorization and send service. Only one
+attachment is accepted; clients cannot supply sender, path, MIME metadata or byte size fields.
+The authenticated attachment GET rechecks active Workspace and both participants before
+opening private storage. Manager/owner/staff/superuser privileges never bypass membership.
+Neither history nor realtime exposes a raw storage path/public URL. Downloads are forced
+attachments with no-store/nosniff headers; Notifications omit filenames and contents.
+WebSocket uploads remain unsupported. Read state and Jalali timestamps are unchanged.

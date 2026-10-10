@@ -1054,7 +1054,8 @@ active Workspace. Inactive/moved participants make the conversation inaccessible
 deleting history. Restoration of valid participant state exposes that same history again.
 
 Messages have UUID, protected Conversation/sender, plain text and an aware created_at.
-Text is trimmed and must contain 1–4,000 characters. No edits/deletes or media content exist.
+Text is trimmed and limited to 4,000 characters. Phase 3A below allows a single attachment
+instead of or alongside text. No edits/deletes exist.
 Services derive sender and Workspace, revalidate current participants and write atomically.
 Normal direct/bulk writes are guarded; raw SQL/base QuerySet maintenance remains trusted
 and outside service guarantees. References are immutable and history is protected.
@@ -1062,7 +1063,7 @@ and outside service guarantees. References are immutable and history is protecte
 Endpoints:
 - GET/POST `/api/v1/chat/conversations/`; POST accepts only participant_id.
 - GET `/api/v1/chat/conversations/<uuid>/`.
-- GET/POST `/api/v1/chat/conversations/<uuid>/messages/`; POST accepts only text.
+- GET/POST `/api/v1/chat/conversations/<uuid>/messages/`; POST accepts text and optional attachment.
 - POST `/api/v1/chat/conversations/<uuid>/read/`; empty object.
 
 GET never advances read state. Explicit read records the current last-message timestamp
@@ -1086,9 +1087,9 @@ body, phone or CRM data is copied. The internal link targets the authorized conv
 A repeated send POST represents a new Message; notification retry is not send deduplication.
 Chat read state and Notification read state are independent in both directions.
 
-Not implemented: realtime/WebSocket, presence, typing, media/voice/files, reactions,
+Later phases below add realtime and image/file attachments. Not implemented: presence, typing, voice/video, reactions,
 edit/delete, forwarding, group chat, announcement channels, search, pins, mute/archive,
-blocking, external users or push/email/SMS. No transport or future media schema is added.
+blocking, external users or push/email/SMS.
 
 ## Internal Chat Phase 2A — realtime delivery
 
@@ -1135,7 +1136,7 @@ network arrival order. No guarantee of delivery during disconnects or process fa
 
 Dependencies added: channels 4.3.2, channels-redis 4.3.0 and its msgpack 1.2.3 dependency;
 existing Redis/Django dependencies are unchanged. No schema migration. Typing,
-presence, receipts, media/voice/files, reactions, groups and announcement channels
+presence, receipts, voice/video, reactions, groups and announcement channels
 remain unimplemented. No frontend or additional Notification producer is introduced.
 
 ### Phase 2B — WebSocket text sending
@@ -1150,3 +1151,45 @@ Invalid input returns Persian `chat.error` with `invalid_message` or `unsupporte
 and leaves the socket open. Unexpected service failures are logged and return `send_failed`
 without internal details; revoked authorization closes with 4403. Read state is unchanged.
 There is no retry deduplication key: each successful send command creates one Message.
+
+### Phase 3A — one private image/file attachment
+
+Message stores one optional private FileField plus safe display filename, validated MIME
+type and measured byte size. No separate attachment/gallery model or speculative indexes.
+Database checks require text or an attachment, and coherent attachment metadata/size.
+The same `send_message` service handles text-only, attachment-only and combined messages.
+REST accepts multipart `text` and `attachment`; duplicate/unknown fields are rejected.
+WebSocket `chat.send` remains text-only; binary uploads and attachment fields are rejected.
+
+Allowed: JPEG/PNG/WebP images up to 10 MiB, PDF and UTF-8 plain text up to 20 MiB. Extension
+and declared MIME must agree with inspected content. Pillow verifies/decodes single-frame
+images with a 16-million-pixel safety bound; PDF checks only header/EOF envelope, and text
+must decode as UTF-8 without binary control characters. These checks are NOT antivirus or
+deep PDF validation. No office/archive/executable types, voice or video are supported.
+Display filenames remove path components/control characters and are limited to 180 characters.
+Storage keys contain only Workspace/Conversation/Message UUIDs, never uploaded filenames.
+
+The Django `chat` storage alias defaults to PrivateChatStorage at CHAT_STORAGE_ROOT (default
+private-chat under the project root), separate from public media/static. Never expose this
+directory through the web server. It refuses raw URLs; future object storage must use a
+private bucket with access only through the service, not public URLs. No CDN/signed URLs.
+GET `/api/v1/chat/messages/<uuid>/attachment/` authenticates and rechecks current participants
+before opening storage. It streams via FileResponse with validated Content-Type, forced
+attachment disposition, no-store, nosniff and sandbox headers. No hierarchy bypass exists.
+
+History, REST creation and the normal realtime Message payload include `attachment` only
+when present: kind, filename, content_type, size and that authenticated internal download_url.
+No bytes/base64, backend URL or storage path is serialized. Text-only responses stay unchanged.
+Notifications remain generic (no filename/content); read state and Jalali formatting are unchanged.
+
+Storage is written before the Message is saved. Failures inside send (including DB/Notification
+failure or commit failure) roll back database writes and attempt to delete the uploaded object;
+partial local-storage failures also attempt cleanup. Cleanup failures are logged. REST calls
+send without an enclosing transaction. Internal upload callers must likewise own the outer
+transaction: a later external rollback, process crash or storage outage can leave an orphan;
+there is no distributed transaction or automatic orphan sweeper. No successful Message is
+returned on storage failure. Existing after-commit fanout runs once and remains best-effort.
+
+Pillow is the only added dependency. Migration chat/0002_message_attachment preserves old
+text messages. No thumbnail/resizing pipeline, multi-attachment, OCR, antivirus, voice/video,
+edit/delete, reactions, groups or announcement channels are implemented.

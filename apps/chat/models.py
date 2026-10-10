@@ -8,6 +8,8 @@ from django.db.models import F, Q
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
+from .attachments import attachment_path, chat_storage, TYPES, IMAGE_LIMIT, FILE_LIMIT
+
 _CHAT_WRITE = object()
 MAX_TEXT_LENGTH = 4000
 
@@ -76,7 +78,12 @@ class Message(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False, verbose_name=_('شناسه'))
     conversation = models.ForeignKey(Conversation, on_delete=models.PROTECT, related_name='messages', verbose_name=_('گفتگو'))
     sender = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, verbose_name=_('فرستنده'))
-    text = models.TextField(validators=[MaxLengthValidator(MAX_TEXT_LENGTH)], verbose_name=_('متن'))
+    text = models.TextField(blank=True, default='', validators=[MaxLengthValidator(MAX_TEXT_LENGTH)], verbose_name=_('متن'))
+    attachment = models.FileField(storage=chat_storage, upload_to=attachment_path, max_length=255,
+                                  blank=True, default='', verbose_name=_('پیوست'))
+    attachment_filename = models.CharField(max_length=180, blank=True, default='', verbose_name=_('نام فایل'))
+    attachment_content_type = models.CharField(max_length=64, blank=True, default='', verbose_name=_('نوع فایل'))
+    attachment_size = models.PositiveIntegerField(null=True, blank=True, verbose_name=_('حجم فایل'))
     created_at = models.DateTimeField(default=timezone.now, editable=False, verbose_name=_('زمان ارسال'))
     objects = ChatQuerySet.as_manager()
 
@@ -84,12 +91,24 @@ class Message(models.Model):
         verbose_name = _('پیام')
         verbose_name_plural = _('پیام‌ها')
         indexes = [models.Index(fields=['conversation', 'created_at', 'id'], name='chat_message_history')]
-        constraints = [models.CheckConstraint(condition=~Q(text=''), name='chat_message_not_empty')]
+        constraints = [
+            models.CheckConstraint(condition=~Q(text='') | ~Q(attachment=''), name='chat_message_content'),
+            models.CheckConstraint(condition=(
+                Q(attachment='', attachment_filename='', attachment_content_type='', attachment_size__isnull=True)
+                | (~Q(attachment='') & ~Q(attachment_filename='') & Q(attachment_size__isnull=False, attachment_size__gt=0)
+                   & (Q(attachment_content_type__in=['image/jpeg', 'image/png', 'image/webp'], attachment_size__lte=IMAGE_LIMIT)
+                      | Q(attachment_content_type__in=['application/pdf', 'text/plain'], attachment_size__lte=FILE_LIMIT)))
+            ), name='chat_attachment_metadata'),
+        ]
 
     def clean(self):
         super().clean()
-        if not isinstance(self.text, str) or not self.text.strip():
-            raise ValidationError({'text': _('متن پیام الزامی است.')})
+        if not isinstance(self.text, str) or not (self.text.strip() or self.attachment):
+            raise ValidationError({'text': _('متن یا پیوست پیام الزامی است.')})
+        if self.attachment:
+            if (self.attachment.name != attachment_path(self, '')
+                    or self.attachment_content_type not in TYPES):
+                raise ValidationError({'attachment': _('پیوست پیام معتبر نیست.')})
         if timezone.is_naive(self.created_at):
             raise ValidationError(_('زمان باید دارای منطقه زمانی باشد.'))
         if self.sender_id not in (self.conversation.participant_a_id, self.conversation.participant_b_id):

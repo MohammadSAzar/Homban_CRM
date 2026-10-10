@@ -120,6 +120,16 @@ LANGUAGES = [
 # Static
 STATIC_URL = 'static/'
 
+# Chat bytes are private, outside public media/static roots; never serve this directory.
+STORAGES = {
+    'default': {'BACKEND': 'django.core.files.storage.FileSystemStorage'},
+    'staticfiles': {'BACKEND': 'django.contrib.staticfiles.storage.StaticFilesStorage'},
+    'chat': {
+        'BACKEND': 'apps.chat.attachments.PrivateChatStorage',
+        'OPTIONS': {'location': os.environ.get('CHAT_STORAGE_ROOT', BASE_DIR / 'private-chat')},
+    },
+}
+
 # Default primary key field type
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 

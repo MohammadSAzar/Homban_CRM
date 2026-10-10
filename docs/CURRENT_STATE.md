@@ -771,8 +771,8 @@ append-only. Lists/history paginate at 50; joined identities and correlated unre
 subqueries keep list query counts constant. Common Jalali formatting supplies all timestamps.
 Text-message creation atomically publishes a generic deduplicated recipient notification;
 no message body is copied and Notification read state remains independent.
-No realtime, presence, typing, media, voice/files, reactions, edit/delete, groups/channels,
-search, mute/archive, frontend or delivery-channel infrastructure is implemented.
+Later Chat phases below add realtime and image/file attachments. Presence, typing, voice/video,
+reactions, edit/delete, groups/channels, search, mute/archive and frontend remain unimplemented.
 
 Verification: 43 focused Chat tests and 70 unchanged Notification tests passed together.
 Chat and Notification production modules have 100% statement coverage. The single full
@@ -797,7 +797,7 @@ successful. Delivery is best effort; reconnect recovery uses REST history, not a
 Read markers and Notification lifecycle remain independent. See DOMAIN for deployment,
 origin/ticket handling and CHAT_REDIS_URL settings. Test channel layers are in-memory only.
 Only channels/channels-redis/msgpack dependencies were added; existing versions unchanged.
-No typing, presence, receipts, media/voice/files, reactions, groups,
+No typing, presence, receipts, voice/video, reactions, groups,
 announcement channels, frontend or push delivery is implemented.
 
 ### Phase 2B — WebSocket send path
@@ -808,3 +808,21 @@ returns the Message UUID after commit; the existing `chat.message` event remains
 full realtime representation. Safe Persian errors preserve valid connections; revoked
 access closes them. Notification publication, Jalali output and read state are unchanged.
 No schema, dependency, additional notification producer or new read semantics were added.
+
+## Internal Chat Phase 3A — image/file attachments
+
+One optional attachment is stored directly on Message with safe filename, MIME and byte size.
+REST multipart sends allow text, attachment, or both through the shared service; WebSocket
+sending remains text-only. JPEG/PNG/WebP: 10 MiB maximum; PDF/UTF-8 text: 20 MiB maximum.
+Pillow validates single-frame images (16-million-pixel bound); PDF/text use conservative
+content checks, not antivirus. No archives/executables or office formats are accepted.
+
+Private Django storage uses the `chat` alias/CHAT_STORAGE_ROOT, separate from public media.
+The participant-only `/api/v1/chat/messages/<uuid>/attachment/` streams authorized downloads.
+REST/history/realtime expose safe metadata and this endpoint only, never storage URLs/paths
+or bytes. Notification, read state and centralized Jalali behavior remain unchanged.
+Send failures attempt file cleanup; outer-transaction/process/storage failure limitations
+are documented in DOMAIN. Migration chat/0002_message_attachment adds only attachment fields
+and content/metadata constraints. Pillow is the only added dependency.
+No voice/video, multiple attachments, thumbnails, OCR/AV service, edit/delete, reactions,
+groups, announcement channels or frontend are implemented.

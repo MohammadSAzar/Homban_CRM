@@ -1,5 +1,6 @@
 """Private chat commands. Workspace locks serialize pair creation, send and read."""
 from datetime import timedelta
+import logging
 
 from django.db import transaction
 from django.db.models import Case, Count, DateTimeField, ExpressionWrapper, F, OuterRef, Q, Subquery, Value, When
@@ -14,6 +15,9 @@ from apps.notifications.models import Notification
 from apps.notifications.services import publish_notification
 from apps.organizations.models import Workspace
 from .models import Conversation, Message, MAX_TEXT_LENGTH, _CHAT_WRITE
+from .attachments import attachment_path, validate_upload, AttachmentUnavailable
+
+logger = logging.getLogger(__name__)
 
 
 def lock_actor(actor):
@@ -86,24 +90,59 @@ def notify_message(message, recipient):
         source_type='chat_message', source_id=message.pk)
 
 
+def send_message(*, actor, pk, text='', attachment=None):
+    stored_name = None
+    storage = None
+    try:
+        with transaction.atomic():
+            actor = lock_actor(actor)
+            row = owned_conversation(actor, pk)
+            if not isinstance(text, str) or len(text.strip()) > MAX_TEXT_LENGTH or not (text.strip() or attachment is not None):
+                raise ValidationError({'text': _('متن معتبر یا پیوست لازم است؛ متن حداکثر ۴۰۰۰ نویسه است.')})
+            last = row.messages.order_by('-created_at', '-pk').values_list('created_at', flat=True).first()
+            # Strictly increasing instants keep read watermarks safe on clock ties/rollback.
+            stamp = max(timezone.now(), last + timedelta(microseconds=1)) if last else timezone.now()
+            message = Message(conversation=row, sender=actor, text=text.strip(), created_at=stamp)
+            if attachment is not None:
+                (message.attachment_filename, message.attachment_content_type,
+                 message.attachment_size) = validate_upload(attachment)
+                storage = message.attachment.storage
+                stored_name = attachment_path(message, '')
+                try:
+                    stored_name = storage.save(stored_name, attachment)
+                except OSError as error:
+                    raise AttachmentUnavailable() from error
+                message.attachment = stored_name
+            message.save(_token=_CHAT_WRITE)
+            row.updated_at = stamp
+            row.save(_token=_CHAT_WRITE)
+            recipient = row.participant_b if actor.pk == row.participant_a_id else row.participant_a
+            notify_message(message, recipient)
+            from .realtime import schedule_message
+            schedule_message(message)
+        return message
+    except Exception:
+        if stored_name is not None:
+            try:
+                storage.delete(stored_name)
+            except Exception:
+                logger.exception('Could not clean up failed Chat upload')
+        raise
+
+
 @transaction.atomic
-def send_message(*, actor, pk, text):
+def open_attachment(*, actor, pk):
     actor = lock_actor(actor)
-    row = owned_conversation(actor, pk)
-    if not isinstance(text, str) or not text.strip() or len(text.strip()) > MAX_TEXT_LENGTH:
-        raise ValidationError({'text': _('متن پیام باید بین ۱ تا ۴۰۰۰ نویسه باشد.')})
-    last = row.messages.order_by('-created_at', '-pk').values_list('created_at', flat=True).first()
-    # Strictly increasing instants make read watermarks safe even on clock ties/rollback.
-    stamp = max(timezone.now(), last + timedelta(microseconds=1)) if last else timezone.now()
-    message = Message(conversation=row, sender=actor, text=text.strip(), created_at=stamp)
-    message.save(_token=_CHAT_WRITE)
-    row.updated_at = stamp
-    row.save(_token=_CHAT_WRITE)
-    recipient = row.participant_b if actor.pk == row.participant_a_id else row.participant_a
-    notify_message(message, recipient)
-    from .realtime import schedule_message
-    schedule_message(message)
-    return message
+    message = Message.objects.filter(pk=pk, conversation__in=conversations(actor)).first()
+    if message is None or not message.attachment:
+        raise NotFound(_('فایل یافت نشد.'))
+    try:
+        stream = message.attachment.storage.open(message.attachment.name, 'rb')
+    except FileNotFoundError:
+        raise NotFound(_('فایل یافت نشد.'))
+    except OSError as error:
+        raise AttachmentUnavailable() from error
+    return message, stream
 
 
 @transaction.atomic

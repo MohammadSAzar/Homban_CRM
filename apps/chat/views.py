@@ -1,4 +1,5 @@
 from django.db import transaction
+from django.http import FileResponse
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -6,7 +7,7 @@ from rest_framework.views import APIView
 from .serializers import (EmptySerializer, OpenSerializer, PageSerializer, SendSerializer,
                           conversation_data, message_data)
 from .services import (lock_actor, mark_conversation_read, open_conversation,
-                       owned_conversation, send_message, summaries)
+                       owned_conversation, send_message, summaries, open_attachment)
 
 
 def validate(serializer_class, data):
@@ -70,6 +71,18 @@ class ConversationReadView(APIView):
         validate(EmptySerializer, request.data)
         row = mark_conversation_read(actor=request.user, pk=pk)
         return Response(conversation_data(summaries(request.user).get(pk=row.pk), request.user))
+
+
+class AttachmentView(APIView):
+    def get(self, request, pk):
+        validate(EmptySerializer, request.query_params.dict())
+        message, stream = open_attachment(actor=request.user, pk=pk)
+        response = FileResponse(stream, as_attachment=True, filename=message.attachment_filename,
+                                content_type=message.attachment_content_type)
+        response['Cache-Control'] = 'private, no-store'
+        response['X-Content-Type-Options'] = 'nosniff'
+        response['Content-Security-Policy'] = "sandbox; default-src 'none'"
+        return response
 
 
 class RealtimeTicketView(APIView):
