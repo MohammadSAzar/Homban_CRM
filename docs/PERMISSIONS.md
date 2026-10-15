@@ -479,3 +479,20 @@ same private attachment endpoint and rechecks current access before storage is o
 No public URL or privileged-role bypass exists. REST uploads only; WebSocket sends remain
 text-only and receive safe voice metadata through normal fanout. Playback does not mark
 Conversation or Notification read. No transcription, AI or Voice-to-CRM access is introduced.
+
+### Official announcements (Chat Phase 4A)
+All five current active customer roles may read only their active Workspace's logical official
+channel. Agency Managers may publish and manage publisher delegation; active same-Workspace
+Range Managers/Secretaries may publish only while delegated. Customer Admins/Consultants
+cannot publish, and no owner/staff/superuser flag bypasses these rules. Every current Agency
+Manager has equal authority. Delegation is unique/idempotent, revocable and cannot change
+Workspace/user identity. Inactive, moved or role-ineligible users fail current-state checks even
+when an old delegation remains. Private Chat privacy is unaffected.
+
+Announcement author and Workspace are server-derived. Lists are Workspace-scoped and
+paginated; only safe professional identity and Jalali time are returned. Moved users' identities
+are omitted from retained history/delegation responses. Announcement body is visible only in
+its original Workspace, never copied into Notifications. Generic notifications go atomically
+to current eligible members except publisher, using recipient-scoped event deduplication.
+GET changes no read state. Announcement edits/deletes, media, targeting and read receipts
+are unavailable. No announcement WebSocket exists yet; realtime is deferred to Phase 4A.1.

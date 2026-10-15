@@ -35,6 +35,7 @@ class Notification(models.Model):
         MATCH = 'match_recommendation', _('پیشنهاد تطبیق')
         COLLABORATION = 'collaboration_request', _('درخواست همکاری')
         CHAT = 'chat_message', _('پیام گفتگو')
+        ANNOUNCEMENT = 'announcement', _('اطلاعیه')
         IMPORT = 'import_review', _('بررسی ورود اطلاعات')
         VOICE = 'voice_review', _('بررسی اطلاعات صوتی')
 
@@ -57,7 +58,7 @@ class Notification(models.Model):
         verbose_name_plural = _('اعلان‌ها')
         constraints = [
             models.UniqueConstraint(fields=['recipient', 'event_key'], name='notification_recipient_event'),
-            models.CheckConstraint(condition=Q(kind__in=['match_recommendation','collaboration_request','chat_message','import_review','voice_review']), name='notification_kind_valid'),
+            models.CheckConstraint(condition=Q(kind__in=['match_recommendation','collaboration_request','chat_message','announcement','import_review','voice_review']), name='notification_kind_valid'),
         ]
         indexes = [
             models.Index(fields=['recipient','read_at','created_at'], name='notification_read_time'),

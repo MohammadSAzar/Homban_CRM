@@ -1,7 +1,11 @@
 from django.urls import path
 from .views import AttachmentView, ConversationDetailView, ConversationListView, ConversationReadView, MessageListView, RealtimeTicketView
+from .announcement_views import AnnouncementListView, PublisherListView, PublisherDetailView
 
 urlpatterns = [
+    path('chat/announcements/', AnnouncementListView.as_view(), name='chat-announcements'),
+    path('chat/announcement-publishers/', PublisherListView.as_view(), name='chat-announcement-publishers'),
+    path('chat/announcement-publishers/<uuid:pk>/', PublisherDetailView.as_view(), name='chat-announcement-publisher'),
     path('chat/messages/<uuid:pk>/attachment/', AttachmentView.as_view(), name='chat-attachment'),
     path('chat/conversations/', ConversationListView.as_view(), name='chat-conversations'),
     path('chat/conversations/<uuid:pk>/', ConversationDetailView.as_view(), name='chat-detail'),

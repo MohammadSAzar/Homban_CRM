@@ -1224,3 +1224,47 @@ General files retain attachment disposition. Playback changes no read markers or
 Existing generic Notification and after-commit fanout run once. Jalali output is unchanged.
 The existing cleanup guarantee and process/outer-rollback/storage-outage limitations apply.
 No STT, transcription, AI, Voice-to-CRM, transcoding, waveform, recording frontend or AV exists.
+
+### Phase 4A — official Workspace announcements
+
+Each Workspace has one logical official announcement channel, without a Channel row or
+customer-configurable channels. Announcement stores UUID, protected Workspace/author, text
+and canonical aware created_at. Text is trimmed, required and limited to 4,000 characters.
+Announcements are append-only through the service and API; no edit/delete or replies exist.
+
+All current active customer roles in an active Workspace may read its history. Every active
+Agency Manager may publish and manage delegation; there is no single-master assumption.
+Only active same-Workspace Range Managers and Secretaries may be delegated publishing.
+Consultants and customer Admins cannot publish. Owner/staff/superuser flags grant nothing.
+AnnouncementPublisher stores UUID, protected Workspace/user and created_at, with database
+Workspace/user uniqueness. Identity is immutable. Delegation POST is idempotent (201 new,
+200 existing); explicit authorized revocation deletes the permission, not announcement history.
+Inactive/moved/role-changed delegates cannot publish; their retained permission is rechecked
+against current state on every action and is not automatically deleted. Current managers
+may revoke retained invalid delegations. Private Conversation access remains unchanged.
+
+GET/POST `/api/v1/chat/announcements/` reads/publishes. GET/POST
+`/api/v1/chat/announcement-publishers/` and DELETE its `<uuid>/` manage permissions, only for
+Agency Managers. Client inputs are text or user_id respectively, never Workspace/author/time.
+Both lists use database pagination (50), newest created_at first then UUID ascending, joined
+safe professional identities and centralized Jalali created_at_display. Historical identities
+are null if their user has moved to another Workspace; history itself remains in its original
+Workspace. GET does not alter any read state. No per-user announcement read records exist.
+
+Publishing holds the existing Workspace-first lock and creates the Announcement and generic
+Persian `announcement` Notifications in one transaction. Recipients are current active customer
+members, excluding the publisher, discovered in keyset batches of 100. No full member list is
+materialized; transaction work still scales with recipient count. Existing Notification service
+rechecks recipients and deduplicates `announcement:<uuid>:created` per recipient. Publication
+errors roll back all rows, never silently leave partial notifications. Notifications contain no
+announcement body/contact data and link to the announcement list. A second publish request
+is a new Announcement; retrying a notification for the same Announcement is deduplicated.
+
+Migrations chat/0004_announcements and notifications/0002_announcements add the two models
+and Notification kind/constraint only. Standard service-only ORM guards apply; raw SQL/base
+QuerySet bypasses are privileged internal operations, not supported application write paths.
+No dependencies were added. Announcement realtime is deferred to Phase 4A.1: a separate
+purpose-bound ticket and Workspace subscription authorization surface is needed; private
+Conversation sockets are unchanged. REST history and Notification Center are available now.
+No General Group, replies, threads, comments, reactions, media, mentions, targeting, receipts,
+pinning, scheduling, edit/delete or frontend is implemented by this phase.

@@ -842,3 +842,25 @@ Shared send service, one generic Notification, after-commit realtime metadata, e
 state, Jalali timestamps and existing cleanup guarantees/limitations remain unchanged.
 WebSocket sending remains text-only. No STT, transcription, AI, Voice-to-CRM, transcoding,
 waveform, recording frontend, antivirus, video, multi-attachment or background media pipeline.
+
+## Internal Chat Phase 4A — Announcement Channel Foundation
+
+One logical official channel per Workspace is now available through GET/POST
+`/api/v1/chat/announcements/`. All active customer roles may read; Agency Managers publish
+by default. Only they manage GET/POST `/api/v1/chat/announcement-publishers/` and DELETE
+`/api/v1/chat/announcement-publishers/<uuid>/`. Delegation is idempotent and limited to active
+same-Workspace Range Managers/Secretaries. Current role/activity/membership is rechecked;
+retained invalid delegations confer no access. Admin/Consultant and owner/staff flags grant
+no publishing bypass. Multiple Agency Managers are supported; private Chat remains private.
+
+Announcement is append-only text (trimmed, 1..4,000 characters) with protected author and
+Workspace. Publisher permissions have database Workspace/user uniqueness. Both lists use
+50-row database pagination, newest time then UUID, joined safe identities and Jalali display.
+Generic `announcement` Notifications publish atomically for eligible Workspace members except
+author, in 100-recipient keyset batches using existing publication/deduplication. Failures roll
+back the entire publish. No announcement body/contact data enters Notification summaries.
+
+Migrations: chat/0004_announcements and notifications/0002_announcements. No new dependency.
+Announcement realtime is deferred to Phase 4A.1 to keep separate ticket/subscription security
+out of this small foundation. No General Group, replies/discussion, threads, reactions, media,
+targeting, receipts, edit/delete, pinning, scheduling or frontend is added.

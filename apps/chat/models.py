@@ -136,3 +136,69 @@ class Message(models.Model):
         return super().save(*args, **kwargs)
 
     delete = service_only
+
+
+class Announcement(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False, verbose_name=_('شناسه'))
+    workspace = models.ForeignKey('organizations.Workspace', on_delete=models.PROTECT, verbose_name=_('مجموعه'))
+    author = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, verbose_name=_('ناشر'))
+    text = models.TextField(validators=[MaxLengthValidator(MAX_TEXT_LENGTH)], verbose_name=_('متن اطلاعیه'))
+    created_at = models.DateTimeField(default=timezone.now, editable=False, verbose_name=_('زمان انتشار'))
+    objects = ChatQuerySet.as_manager()
+
+    class Meta:
+        verbose_name = _('اطلاعیه')
+        verbose_name_plural = _('اطلاعیه‌ها')
+        indexes = [models.Index(fields=['workspace', '-created_at', 'id'], name='chat_announcement_history')]
+        constraints = [models.CheckConstraint(condition=~Q(text=''), name='chat_announcement_text')]
+
+    def clean(self):
+        super().clean()
+        if self.author_id and self.author.workspace_id != self.workspace_id:
+            raise ValidationError(_('ناشر باید متعلق به همین مجموعه باشد.'))
+        if not isinstance(self.text, str) or not self.text.strip() or self.text != self.text.strip():
+            raise ValidationError({'text': _('متن اطلاعیه معتبر نیست.')})
+        if timezone.is_naive(self.created_at):
+            raise ValidationError(_('زمان باید دارای منطقه زمانی باشد.'))
+
+    def save(self, *args, _token=None, **kwargs):
+        if _token is not _CHAT_WRITE or not self._state.adding or kwargs.get('update_fields') is not None:
+            service_only()
+        self.full_clean()
+        return super().save(*args, **kwargs)
+
+    delete = service_only
+
+
+class AnnouncementPublisher(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False, verbose_name=_('شناسه'))
+    workspace = models.ForeignKey('organizations.Workspace', on_delete=models.PROTECT, verbose_name=_('مجموعه'))
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, verbose_name=_('ناشر مجاز'))
+    created_at = models.DateTimeField(default=timezone.now, editable=False, verbose_name=_('زمان واگذاری'))
+    objects = ChatQuerySet.as_manager()
+
+    class Meta:
+        verbose_name = _('مجوز انتشار اطلاعیه')
+        verbose_name_plural = _('مجوزهای انتشار اطلاعیه')
+        constraints = [models.UniqueConstraint(fields=['workspace', 'user'], name='chat_unique_publisher')]
+
+    def clean(self):
+        super().clean()
+        from apps.accounts.models import User
+        if self.user_id and (self.user.workspace_id != self.workspace_id or not self.user.is_active
+                or self.user.role not in (User.Role.RANGE_MANAGER, User.Role.SECRETARY)
+                or not self.workspace.is_active):
+            raise ValidationError(_('مجوز فقط برای مدیر رنج یا منشی فعال همین مجموعه مجاز است.'))
+        if timezone.is_naive(self.created_at):
+            raise ValidationError(_('زمان باید دارای منطقه زمانی باشد.'))
+
+    def save(self, *args, _token=None, **kwargs):
+        if _token is not _CHAT_WRITE or not self._state.adding or kwargs.get('update_fields') is not None:
+            service_only()
+        self.full_clean()
+        return super().save(*args, **kwargs)
+
+    def delete(self, *args, _token=None, **kwargs):
+        if _token is not _CHAT_WRITE:
+            service_only()
+        return super().delete(*args, **kwargs)
