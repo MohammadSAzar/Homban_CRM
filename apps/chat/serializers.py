@@ -43,9 +43,11 @@ def message_data(row, actor):
             'created_at_display': timestamp_display(row.created_at)}
     if row.attachment:
         data['attachment'] = {
-            'kind': 'image' if row.attachment_content_type.startswith('image/') else 'file',
+            'kind': row.attachment_kind,
             'filename': row.attachment_filename, 'content_type': row.attachment_content_type,
             'size': row.attachment_size,
             'download_url': f'/api/v1/chat/messages/{row.pk}/attachment/',
         }
+        if row.attachment_kind == 'voice':
+            data['attachment']['duration_seconds'] = row.attachment_duration_seconds
     return data

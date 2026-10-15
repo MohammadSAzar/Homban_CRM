@@ -9,3 +9,4 @@ jdatetime==6.1.0
 channels>=4.3,<4.4
 channels-redis>=4.3,<4.4
 Pillow>=12,<13
+mutagen>=1.47,<1.48

@@ -1165,7 +1165,7 @@ Allowed: JPEG/PNG/WebP images up to 10 MiB, PDF and UTF-8 plain text up to 20 Mi
 and declared MIME must agree with inspected content. Pillow verifies/decodes single-frame
 images with a 16-million-pixel safety bound; PDF checks only header/EOF envelope, and text
 must decode as UTF-8 without binary control characters. These checks are NOT antivirus or
-deep PDF validation. No office/archive/executable types, voice or video are supported.
+deep PDF validation. No office/archive/executable types or video are supported. Voice support is defined below.
 Display filenames remove path components/control characters and are limited to 180 characters.
 Storage keys contain only Workspace/Conversation/Message UUIDs, never uploaded filenames.
 
@@ -1174,8 +1174,9 @@ private-chat under the project root), separate from public media/static. Never e
 directory through the web server. It refuses raw URLs; future object storage must use a
 private bucket with access only through the service, not public URLs. No CDN/signed URLs.
 GET `/api/v1/chat/messages/<uuid>/attachment/` authenticates and rechecks current participants
-before opening storage. It streams via FileResponse with validated Content-Type, forced
-attachment disposition, no-store, nosniff and sandbox headers. No hierarchy bypass exists.
+before opening storage. It streams via FileResponse with validated Content-Type, attachment
+disposition for images/general files (voice inline), no-store, nosniff and sandbox headers.
+No hierarchy bypass exists.
 
 History, REST creation and the normal realtime Message payload include `attachment` only
 when present: kind, filename, content_type, size and that authenticated internal download_url.
@@ -1191,5 +1192,35 @@ there is no distributed transaction or automatic orphan sweeper. No successful M
 returned on storage failure. Existing after-commit fanout runs once and remains best-effort.
 
 Pillow is the only added dependency. Migration chat/0002_message_attachment preserves old
-text messages. No thumbnail/resizing pipeline, multi-attachment, OCR, antivirus, voice/video,
+text messages. No thumbnail/resizing pipeline, multi-attachment, OCR, antivirus, video,
 edit/delete, reactions, groups or announcement channels are implemented.
+
+
+### Phase 3B — private Voice Messages
+
+Voice reuses the single Message attachment and authoritative `send_message` service.
+The deliberately narrow format is Ogg/Opus (`audio/ogg`, `.ogg`/`.oga`), single-stream
+mono/stereo mapping family 0. WebM, MP3 and MP4 are not accepted: safely checking their
+containers/duration is deferred rather than adding codecs or a media-processing stack.
+Maximum size is 25 MiB; duration must be positive and at most 600 seconds before rounding.
+Mutagen 1.47 provides container/header parsing. Bounded checks verify every page CRC,
+sequence/EOS, packet framing and sample-position consistency. Duration derives from
+48 kHz granules/pre-skip, using integer arithmetic and rounding fractions up to seconds.
+This is container/framing validation, not full audio decoding or antivirus scanning.
+Chained/multiplexed streams and packets/comments exceeding 64 KiB are rejected.
+
+Migration chat/0003_voice_duration adds only nullable duration and corresponding constraints.
+The validated persisted MIME determines explicit API `kind=voice`; no redundant kind column
+or separate VoiceMessage model exists. Non-voice duration must be NULL; voice requires 1..600.
+Clients may submit only text/attachment, never trusted kind, duration, MIME or storage metadata.
+Text may accompany voice. Image/file representations remain unchanged; voice metadata adds
+`duration_seconds`. No bytes/base64 or private storage paths are returned.
+
+REST multipart upload only; WebSocket send stays text-only. Existing private Django storage,
+current participant authorization and streaming attachment endpoint are reused. Voice uses
+inline disposition and validated audio Content-Type; no-store/nosniff/sandbox remain intact.
+FileResponse supports sequential playback/download; custom byte-range seeking is not provided.
+General files retain attachment disposition. Playback changes no read markers or Notifications.
+Existing generic Notification and after-commit fanout run once. Jalali output is unchanged.
+The existing cleanup guarantee and process/outer-rollback/storage-outage limitations apply.
+No STT, transcription, AI, Voice-to-CRM, transcoding, waveform, recording frontend or AV exists.

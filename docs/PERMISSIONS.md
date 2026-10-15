@@ -468,5 +468,14 @@ attachment is accepted; clients cannot supply sender, path, MIME metadata or byt
 The authenticated attachment GET rechecks active Workspace and both participants before
 opening private storage. Manager/owner/staff/superuser privileges never bypass membership.
 Neither history nor realtime exposes a raw storage path/public URL. Downloads are forced
-attachments with no-store/nosniff headers; Notifications omit filenames and contents.
+attachments for images/general files (voice streams inline), with no-store/nosniff headers; Notifications omit filenames and contents.
 WebSocket uploads remain unsupported. Read state and Jalali timestamps are unchanged.
+
+
+### Chat Voice Messages
+Ogg/Opus voice uploads share the same service, Workspace and participant-only permissions.
+Duration/kind are server-derived; client metadata overrides are rejected. Playback uses the
+same private attachment endpoint and rechecks current access before storage is opened.
+No public URL or privileged-role bypass exists. REST uploads only; WebSocket sends remain
+text-only and receive safe voice metadata through normal fanout. Playback does not mark
+Conversation or Notification read. No transcription, AI or Voice-to-CRM access is introduced.

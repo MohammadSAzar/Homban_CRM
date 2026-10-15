@@ -105,7 +105,7 @@ def send_message(*, actor, pk, text='', attachment=None):
             message = Message(conversation=row, sender=actor, text=text.strip(), created_at=stamp)
             if attachment is not None:
                 (message.attachment_filename, message.attachment_content_type,
-                 message.attachment_size) = validate_upload(attachment)
+                 message.attachment_size, message.attachment_duration_seconds) = validate_upload(attachment)
                 storage = message.attachment.storage
                 stored_name = attachment_path(message, '')
                 try:

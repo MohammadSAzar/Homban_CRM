@@ -9,6 +9,7 @@ from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
 from .attachments import attachment_path, chat_storage, TYPES, IMAGE_LIMIT, FILE_LIMIT
+from .voice import VOICE_MIME, VOICE_LIMIT, VOICE_SECONDS
 
 _CHAT_WRITE = object()
 MAX_TEXT_LENGTH = 4000
@@ -84,6 +85,7 @@ class Message(models.Model):
     attachment_filename = models.CharField(max_length=180, blank=True, default='', verbose_name=_('نام فایل'))
     attachment_content_type = models.CharField(max_length=64, blank=True, default='', verbose_name=_('نوع فایل'))
     attachment_size = models.PositiveIntegerField(null=True, blank=True, verbose_name=_('حجم فایل'))
+    attachment_duration_seconds = models.PositiveSmallIntegerField(null=True, blank=True, verbose_name=_('مدت پیام صوتی به ثانیه'))
     created_at = models.DateTimeField(default=timezone.now, editable=False, verbose_name=_('زمان ارسال'))
     objects = ChatQuerySet.as_manager()
 
@@ -97,9 +99,21 @@ class Message(models.Model):
                 Q(attachment='', attachment_filename='', attachment_content_type='', attachment_size__isnull=True)
                 | (~Q(attachment='') & ~Q(attachment_filename='') & Q(attachment_size__isnull=False, attachment_size__gt=0)
                    & (Q(attachment_content_type__in=['image/jpeg', 'image/png', 'image/webp'], attachment_size__lte=IMAGE_LIMIT)
-                      | Q(attachment_content_type__in=['application/pdf', 'text/plain'], attachment_size__lte=FILE_LIMIT)))
+                      | Q(attachment_content_type__in=['application/pdf', 'text/plain'], attachment_size__lte=FILE_LIMIT)
+                      | Q(attachment_content_type=VOICE_MIME, attachment_size__lte=VOICE_LIMIT)))
             ), name='chat_attachment_metadata'),
+            models.CheckConstraint(condition=(
+                Q(attachment_content_type=VOICE_MIME, attachment_duration_seconds__isnull=False,
+                  attachment_duration_seconds__gte=1, attachment_duration_seconds__lte=VOICE_SECONDS)
+                | (~Q(attachment_content_type=VOICE_MIME) & Q(attachment_duration_seconds__isnull=True))
+            ), name='chat_voice_duration'),
         ]
+
+    @property
+    def attachment_kind(self):
+        if self.attachment_content_type == VOICE_MIME:
+            return 'voice'
+        return 'image' if self.attachment_content_type.startswith('image/') else 'file'
 
     def clean(self):
         super().clean()

@@ -9,6 +9,7 @@ from django.core.files.uploadedfile import UploadedFile
 from django.utils.translation import gettext_lazy as _
 from PIL import Image, UnidentifiedImageError
 from rest_framework.exceptions import APIException, ValidationError
+from .voice import VOICE_MIME, VOICE_LIMIT, voice_duration
 
 IMAGE_LIMIT = 10 * 1024 * 1024
 FILE_LIMIT = 20 * 1024 * 1024
@@ -19,6 +20,7 @@ TYPES = {
     'image/webp': ('.webp',),
     'application/pdf': ('.pdf',),
     'text/plain': ('.txt',),
+    VOICE_MIME: ('.ogg', '.oga'),
 }
 
 
@@ -79,11 +81,12 @@ def validate_upload(upload):
     suffix = PurePosixPath(filename).suffix.lower()
     if not filename or len(filename) > 180 or content_type not in TYPES or suffix not in TYPES[content_type]:
         invalid_upload()
-    limit = IMAGE_LIMIT if content_type.startswith('image/') else FILE_LIMIT
+    limit = VOICE_LIMIT if content_type == VOICE_MIME else IMAGE_LIMIT if content_type.startswith('image/') else FILE_LIMIT
     if upload.size is None or upload.size <= 0 or upload.size > limit:
         invalid_upload()
     size = 0
     decoder = codecs.getincrementaldecoder('utf-8')() if content_type == 'text/plain' else None
+    duration = None
     try:
         upload.seek(0)
         while chunk := upload.read(64 * 1024):
@@ -99,7 +102,9 @@ def validate_upload(upload):
         if decoder:
             decoder.decode(b'', final=True)
         upload.seek(0)
-        if content_type.startswith('image/'):
+        if content_type == VOICE_MIME:
+            duration = voice_duration(upload)
+        elif content_type.startswith('image/'):
             with warnings.catch_warnings():
                 warnings.simplefilter('error', Image.DecompressionBombWarning)
                 with Image.open(upload) as image:
@@ -122,4 +127,4 @@ def validate_upload(upload):
     finally:
         if not upload.closed:
             upload.seek(0)
-    return filename, content_type, size
+    return filename, content_type, size, duration

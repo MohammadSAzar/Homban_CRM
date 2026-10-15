@@ -77,7 +77,7 @@ class AttachmentView(APIView):
     def get(self, request, pk):
         validate(EmptySerializer, request.query_params.dict())
         message, stream = open_attachment(actor=request.user, pk=pk)
-        response = FileResponse(stream, as_attachment=True, filename=message.attachment_filename,
+        response = FileResponse(stream, as_attachment=message.attachment_kind != 'voice', filename=message.attachment_filename,
                                 content_type=message.attachment_content_type)
         response['Cache-Control'] = 'private, no-store'
         response['X-Content-Type-Options'] = 'nosniff'

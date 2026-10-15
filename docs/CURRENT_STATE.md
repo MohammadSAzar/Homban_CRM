@@ -824,5 +824,21 @@ or bytes. Notification, read state and centralized Jalali behavior remain unchan
 Send failures attempt file cleanup; outer-transaction/process/storage failure limitations
 are documented in DOMAIN. Migration chat/0002_message_attachment adds only attachment fields
 and content/metadata constraints. Pillow is the only added dependency.
-No voice/video, multiple attachments, thumbnails, OCR/AV service, edit/delete, reactions,
+No video, multiple attachments, thumbnails, OCR/AV service, edit/delete, reactions,
 groups, announcement channels or frontend are implemented.
+
+
+## Internal Chat Phase 3B — Voice Messages
+
+REST multipart supports one Ogg/Opus voice attachment (`audio/ogg`, .ogg/.oga, mono/stereo
+mapping family 0), optionally with text. Limit: 25 MiB and 600 seconds. Mutagen 1.47 plus
+bounded container/packet validation derives integer duration (fractional seconds rounded up);
+client duration/kind are never trusted. WebM/MP3/MP4 are deliberately unsupported in this phase.
+Migration chat/0003_voice_duration adds nullable duration and voice/non-voice constraints;
+validated MIME supplies API classification. Existing image/file responses remain compatible.
+Private storage and current participant-only streaming endpoint are reused; voice is inline,
+with no public storage URLs. Sequential playback is supported without custom Range seeking.
+Shared send service, one generic Notification, after-commit realtime metadata, explicit read
+state, Jalali timestamps and existing cleanup guarantees/limitations remain unchanged.
+WebSocket sending remains text-only. No STT, transcription, AI, Voice-to-CRM, transcoding,
+waveform, recording frontend, antivirus, video, multi-attachment or background media pipeline.
