@@ -127,8 +127,14 @@ Announcement posting:
 - Agency manager may delegate to range managers and/or secretary
 
 General group:
-- Everyone can participate
-- Agency manager can enable/disable it
+- One optional Workspace-wide group, Team-only; all active customer roles participate
+  automatically when enabled. No manual membership or custom groups.
+- Current Workspace Chat Authority enables/disables it: active Agency Managers take
+  precedence; active Range Managers inherit authority only when none exist.
+- Without either active manager role, Personal/consultant-only Workspaces have no Chat.
+  Customer type and workspace ownership do not grant Chat authority.
+- The Phase 4B foundation is text-only REST history/sending, disabled by default;
+  disabling retains history. General Group realtime is deferred to Phase 4B.1.
 
 Content:
 - Text

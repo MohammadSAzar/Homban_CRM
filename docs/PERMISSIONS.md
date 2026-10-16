@@ -535,3 +535,37 @@ revocation. Authority never grants access to another user's private conversation
 No schema, dependency, ticket/protocol or notification/read lifecycle change is introduced.
 This is Chat-only compatibility; permanent repository-wide Personal/Team design and
 General Group remain deferred.
+
+
+### Internal Chat Phase 4B — General Group Foundation
+
+One logical optional General Group per Workspace uses two Chat models, separate from
+private Conversation/Message: GeneralGroupSettings (UUID, unique protected Workspace,
+is_enabled, created_at/updated_at) and GeneralGroupMessage (UUID, protected Workspace/sender,
+text, created_at). No settings row means disabled; GET never creates a row. Authorized
+PATCH lazily creates settings. Disable denies history/sending while retaining settings and
+messages; re-enable restores history. Workspace-first locking serializes settings writes
+and message sends; database uniqueness prevents duplicate settings.
+
+GET/POST `/api/v1/chat/general-group/` lists/sends; GET/PATCH
+`/api/v1/chat/general-group/settings/` reads/changes only is_enabled. PATCH requires a JSON
+boolean. Unknown inputs are rejected. Sender and Workspace are server-derived. Messages
+are append-only trimmed text of 1..4,000 characters. History is database-paginated (50),
+oldest created_at then UUID, with joined safe professional sender identity and centralized
+Jalali created_at_display. A sender moved to another Workspace is represented as null;
+the message stays in its original Workspace. No phone or raw Gregorian timestamps appear.
+
+The unchanged centralized Chat policy applies before all access. All current active customer
+roles may read settings, and read/send when enabled, regardless of Range. Only current
+Workspace Chat Authority changes settings: Agency Managers when present, otherwise Range
+Managers. Owner/staff/superuser/customer_type confer no bypass. Authority transitions are
+immediate without changing enabled state. Team-to-Personal denies all access but retains
+state/history; Personal-to-Team restores access if still enabled. Private Chat and
+Announcements remain independent and unchanged.
+
+Migration chat/0005_general_group adds only these two models, Workspace uniqueness,
+nonempty message constraint and Workspace/created_at/UUID history index. No dependency.
+No group Notifications, unread/read markers, receipts, membership rows or GET mutations.
+No realtime/tickets/Channels fanout (deferred to Phase 4B.1), media, replies, reactions,
+edit/delete, targeting, custom groups, moderation or frontend. The permanent repository-wide
+Personal/Team redesign remains deferred; no workspace_mode or organization schema changes.

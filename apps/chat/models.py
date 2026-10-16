@@ -202,3 +202,65 @@ class AnnouncementPublisher(models.Model):
         if _token is not _CHAT_WRITE:
             service_only()
         return super().delete(*args, **kwargs)
+
+
+class GeneralGroupSettings(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False, verbose_name=_('شناسه'))
+    workspace = models.OneToOneField('organizations.Workspace', on_delete=models.PROTECT, verbose_name=_('مجموعه'))
+    is_enabled = models.BooleanField(default=False, verbose_name=_('فعال'))
+    created_at = models.DateTimeField(default=timezone.now, editable=False, verbose_name=_('زمان ایجاد'))
+    updated_at = models.DateTimeField(default=timezone.now, editable=False, verbose_name=_('زمان تغییر'))
+    objects = ChatQuerySet.as_manager()
+
+    class Meta:
+        verbose_name = _('تنظیمات گروه عمومی')
+        verbose_name_plural = _('تنظیمات گروه عمومی')
+
+    def clean(self):
+        super().clean()
+        if any(timezone.is_naive(value) for value in (self.created_at, self.updated_at)):
+            raise ValidationError(_('زمان باید دارای منطقه زمانی باشد.'))
+        if not self._state.adding:
+            old = type(self).objects.get(pk=self.pk)
+            if old.workspace_id != self.workspace_id or old.created_at != self.created_at:
+                raise ValidationError(_('مجموعه و زمان ایجاد قابل تغییر نیستند.'))
+
+    def save(self, *args, _token=None, **kwargs):
+        if _token is not _CHAT_WRITE or kwargs.get('update_fields') is not None:
+            service_only()
+        self.full_clean()
+        return super().save(*args, **kwargs)
+
+    delete = service_only
+
+
+class GeneralGroupMessage(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False, verbose_name=_('شناسه'))
+    workspace = models.ForeignKey('organizations.Workspace', on_delete=models.PROTECT, verbose_name=_('مجموعه'))
+    sender = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, verbose_name=_('فرستنده'))
+    text = models.TextField(validators=[MaxLengthValidator(MAX_TEXT_LENGTH)], verbose_name=_('متن پیام'))
+    created_at = models.DateTimeField(default=timezone.now, editable=False, verbose_name=_('زمان ارسال'))
+    objects = ChatQuerySet.as_manager()
+
+    class Meta:
+        verbose_name = _('پیام گروه عمومی')
+        verbose_name_plural = _('پیام‌های گروه عمومی')
+        indexes = [models.Index(fields=['workspace', 'created_at', 'id'], name='chat_general_group_history')]
+        constraints = [models.CheckConstraint(condition=~Q(text=''), name='chat_general_group_text')]
+
+    def clean(self):
+        super().clean()
+        if self.sender_id and self.sender.workspace_id != self.workspace_id:
+            raise ValidationError(_('فرستنده باید متعلق به همین مجموعه باشد.'))
+        if not isinstance(self.text, str) or not self.text.strip() or self.text != self.text.strip():
+            raise ValidationError({'text': _('متن پیام معتبر نیست.')})
+        if timezone.is_naive(self.created_at):
+            raise ValidationError(_('زمان باید دارای منطقه زمانی باشد.'))
+
+    def save(self, *args, _token=None, **kwargs):
+        if _token is not _CHAT_WRITE or not self._state.adding or kwargs.get('update_fields') is not None:
+            service_only()
+        self.full_clean()
+        return super().save(*args, **kwargs)
+
+    delete = service_only
