@@ -8,18 +8,14 @@ from apps.notifications.models import Notification
 from apps.notifications.services import publish_notification
 from .models import Announcement, AnnouncementPublisher, MAX_TEXT_LENGTH, _CHAT_WRITE
 from .services import lock_actor
+from .policies import has_workspace_chat_authority, require_workspace_chat_authority
 
 DELEGATED_ROLES = (User.Role.RANGE_MANAGER, User.Role.SECRETARY)
 RECIPIENT_BATCH_SIZE = 100
 
 
-def require_manager(actor):
-    if actor.role != User.Role.AGENCY_MANAGER:
-        raise PermissionDenied(_('فقط مدیر املاک می‌تواند مجوز انتشار را مدیریت کند.'))
-
-
 def can_publish(actor):
-    return actor.role == User.Role.AGENCY_MANAGER or (
+    return has_workspace_chat_authority(actor) or (
         actor.role in DELEGATED_ROLES and AnnouncementPublisher.objects.filter(
             workspace_id=actor.workspace_id, user=actor).exists())
 
@@ -32,7 +28,7 @@ def list_announcements(actor):
 
 def list_publishers(actor):
     actor = lock_actor(actor)
-    require_manager(actor)
+    require_workspace_chat_authority(actor)
     return AnnouncementPublisher.objects.filter(workspace_id=actor.workspace_id).select_related('user').order_by('-created_at', 'pk')
 
 
@@ -78,7 +74,7 @@ def publish_announcement(*, actor, text):
 @transaction.atomic
 def delegate_publisher(*, actor, user_id):
     actor = lock_actor(actor)
-    require_manager(actor)
+    require_workspace_chat_authority(actor)
     target = User.objects.select_for_update().filter(pk=user_id, workspace=actor.workspace,
         is_active=True, role__in=DELEGATED_ROLES).first()
     if target is None:
@@ -95,7 +91,7 @@ def delegate_publisher(*, actor, user_id):
 @transaction.atomic
 def remove_publisher(*, actor, delegation_id):
     actor = lock_actor(actor)
-    require_manager(actor)
+    require_workspace_chat_authority(actor)
     row = AnnouncementPublisher.objects.filter(pk=delegation_id, workspace=actor.workspace).first()
     if row is None:
         raise NotFound(_('مجوز انتشار یافت نشد.'))

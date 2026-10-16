@@ -15,7 +15,7 @@ from apps.chat.services import send_message
 from apps.chat.tests.test_attachments import private_storage, post
 from apps.chat.tests.test_chat import client
 from apps.chat.tests.test_realtime import setup, socket, ticket
-from apps.tasks.tests.conftest import people
+from apps.chat.tests.fixtures import people
 from apps.notifications.models import Notification
 from apps.chat.voice import VOICE_LIMIT, packet_samples
 

@@ -16,7 +16,7 @@ from apps.chat.services import send_message
 from apps.chat.tests.test_chat import client, URL
 from apps.chat.tests.test_realtime import setup, socket, ticket
 from apps.notifications.models import Notification
-from apps.tasks.tests.conftest import people
+from apps.chat.tests.fixtures import people
 
 pytestmark = pytest.mark.django_db(transaction=True)
 

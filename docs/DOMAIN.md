@@ -1050,7 +1050,7 @@ Workspace and two protected, distinct User references in canonical UUID order, t
 read timestamps, and creation/activity timestamps. Database pair uniqueness and ordered-pair
 checks back Workspace-first transactions: opposite-direction creation returns the same row.
 All five active customer roles may participate; both users must remain active in the same
-active Workspace. Inactive/moved participants make the conversation inaccessible without
+active, Team-capable Workspace (Phase 4A.2 below). Inactive/moved participants make the conversation inaccessible without
 deleting history. Restoration of valid participant state exposes that same history again.
 
 Messages have UUID, protected Conversation/sender, plain text and an aware created_at.
@@ -1232,8 +1232,8 @@ customer-configurable channels. Announcement stores UUID, protected Workspace/au
 and canonical aware created_at. Text is trimmed, required and limited to 4,000 characters.
 Announcements are append-only through the service and API; no edit/delete or replies exist.
 
-All current active customer roles in an active Workspace may read its history. Every active
-Agency Manager may publish and manage delegation; there is no single-master assumption.
+All current active customer roles in a Team-capable Workspace may read its history.
+Current Workspace Chat authorities may publish and manage delegation (Phase 4A.2 below).
 Only active same-Workspace Range Managers and Secretaries may be delegated publishing.
 Consultants and customer Admins cannot publish. Owner/staff/superuser flags grant nothing.
 AnnouncementPublisher stores UUID, protected Workspace/user and created_at, with database
@@ -1245,7 +1245,8 @@ may revoke retained invalid delegations. Private Conversation access remains unc
 
 GET/POST `/api/v1/chat/announcements/` reads/publishes. GET/POST
 `/api/v1/chat/announcement-publishers/` and DELETE its `<uuid>/` manage permissions, only for
-Agency Managers. Client inputs are text or user_id respectively, never Workspace/author/time.
+Workspace Chat authorities. Client inputs are text or user_id respectively, never
+Workspace/author/time.
 Both lists use database pagination (50), newest created_at first then UUID ascending, joined
 safe professional identities and centralized Jalali created_at_display. Historical identities
 are null if their user has moved to another Workspace; history itself remains in its original
@@ -1300,3 +1301,29 @@ logging. Delivery failures cannot undo committed Announcements or Notifications.
 is best-effort: REST history and Notification Center remain recovery sources, with no replay,
 outbox, durable event log, reconnect backfill, receipt, targeting or General Group. No schema,
 dependency, origin setting or private Conversation consumer changes are introduced.
+
+
+### Chat Team-only compatibility policy (Phase 4A.2)
+
+Chat requires an active Workspace with at least one active Agency Manager or Range
+Manager. Without either role, every Chat surface is denied: private history, sends,
+read actions, attachments/voice, announcement history/publishing/delegation, both
+realtime tickets, socket connections and deliveries. Historical records and Notifications
+are retained; normal access can resume when the Workspace becomes Team-capable.
+
+`apps.chat.policies` centralizes the policy at the existing Workspace-first `lock_actor`
+boundary. Current active Agency Managers are equal Workspace Chat authorities. Only when
+none exist do all active Range Managers inherit publishing and delegation administration.
+An Agency Manager appearing immediately removes Range Managers' implicit global authority;
+valid retained publisher delegation can still allow them to publish, but not administer.
+Removing/deactivating the final Agency Manager restores Range Manager authority if one
+remains. No manager means Chat is unavailable. Every request/socket recheck reads current
+DB topology; no cached ticket claim grants continued access.
+
+Delegation remains limited to active same-Workspace Range Managers/Secretaries and is not
+needed for current authorities. Existing delegation rows are preserved until explicit
+revocation. Authority never grants access to another user's private conversation.
+`customer_type`, workspace ownership, staff and superuser flags grant no Chat authority.
+No schema, dependency, ticket/protocol or notification/read lifecycle change is introduced.
+This is Chat-only compatibility; permanent repository-wide Personal/Team design and
+General Group remain deferred.

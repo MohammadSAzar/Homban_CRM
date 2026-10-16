@@ -437,7 +437,7 @@ All dates use the shared Persian/Jalali boundary; event keys and internal owners
 
 ### Private Chat Phase 1
 All five active customer roles may open private conversations with another active user in
-the same active Workspace. Only the two current participants may list/read/send/mark read.
+the same active, Team-capable Workspace (Phase 4A.2 below). Only the two current participants may list/read/send/mark read.
 Agency/Range hierarchy, workspace ownership, staff and superuser confer no bypass.
 Workspace-less users are denied; foreign, unrelated, or no-longer-valid conversation UUIDs
 return not found. Both participant Workspace memberships and active states are checked on
@@ -482,10 +482,11 @@ Conversation or Notification read. No transcription, AI or Voice-to-CRM access i
 
 ### Official announcements (Chat Phase 4A)
 All five current active customer roles may read only their active Workspace's logical official
-channel. Agency Managers may publish and manage publisher delegation; active same-Workspace
-Range Managers/Secretaries may publish only while delegated. Customer Admins/Consultants
-cannot publish, and no owner/staff/superuser flag bypasses these rules. Every current Agency
-Manager has equal authority. Delegation is unique/idempotent, revocable and cannot change
+channel when Chat is Team-capable. Current Workspace Chat authorities may publish and manage
+publisher delegation; non-authority Range Managers/Secretaries may publish while delegated.
+Customer Admins/Consultants
+cannot publish, and no owner/staff/superuser flag bypasses these rules. Current authority roles
+follow the dynamic Phase 4A.2 policy below. Delegation is unique/idempotent, revocable and cannot change
 Workspace/user identity. Inactive, moved or role-ineligible users fail current-state checks even
 when an old delegation remains. Private Chat privacy is unaffected.
 
@@ -508,3 +509,29 @@ Workspace before REST-safe Announcement serialization, including moved-author pr
 Announcement sockets cannot publish, delegate or mutate read state. Publisher may receive
 realtime while still receiving no self-Notification. Delivery is after commit and best-effort;
 REST history and Notification Center remain independent recovery sources. No replay or receipts.
+
+
+### Chat Team-only compatibility policy (Phase 4A.2)
+
+Chat requires an active Workspace with at least one active Agency Manager or Range
+Manager. Without either role, every Chat surface is denied: private history, sends,
+read actions, attachments/voice, announcement history/publishing/delegation, both
+realtime tickets, socket connections and deliveries. Historical records and Notifications
+are retained; normal access can resume when the Workspace becomes Team-capable.
+
+`apps.chat.policies` centralizes the policy at the existing Workspace-first `lock_actor`
+boundary. Current active Agency Managers are equal Workspace Chat authorities. Only when
+none exist do all active Range Managers inherit publishing and delegation administration.
+An Agency Manager appearing immediately removes Range Managers' implicit global authority;
+valid retained publisher delegation can still allow them to publish, but not administer.
+Removing/deactivating the final Agency Manager restores Range Manager authority if one
+remains. No manager means Chat is unavailable. Every request/socket recheck reads current
+DB topology; no cached ticket claim grants continued access.
+
+Delegation remains limited to active same-Workspace Range Managers/Secretaries and is not
+needed for current authorities. Existing delegation rows are preserved until explicit
+revocation. Authority never grants access to another user's private conversation.
+`customer_type`, workspace ownership, staff and superuser flags grant no Chat authority.
+No schema, dependency, ticket/protocol or notification/read lifecycle change is introduced.
+This is Chat-only compatibility; permanent repository-wide Personal/Team design and
+General Group remain deferred.

@@ -20,7 +20,7 @@ from apps.chat.announcement_services import publish_announcement
 from apps.chat.models import Announcement, AnnouncementPublisher, Message
 from apps.chat.tests.test_chat import client
 from apps.chat.tests.test_announcements import manager, URL
-from apps.tasks.tests.conftest import people
+from apps.chat.tests.fixtures import people
 from apps.notifications.models import Notification
 from common.jalali import schedule
 
@@ -220,6 +220,7 @@ def test_event_workspace_check_and_moved_author_privacy(people, manager, app):
     foreign_manager = people.user('foreign-manager', role='agency_manager', ws=people.foreign_workspace)
     foreign_row = publish_announcement(actor=foreign_manager, text='foreign')
     value = create_ticket(actor=people.owner)
+    people.user('remaining-manager', role='range_manager')
     User.objects.filter(pk=manager.pk).update(workspace=people.foreign_workspace)
     async def run():
         async with socket(app, value) as (ws, _):

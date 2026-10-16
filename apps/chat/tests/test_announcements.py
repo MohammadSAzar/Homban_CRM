@@ -15,7 +15,7 @@ from apps.chat.models import Announcement, AnnouncementPublisher
 from apps.chat.tests.test_chat import client
 from apps.notifications.models import Notification
 from apps.notifications.services import publish_notification
-from apps.tasks.tests.conftest import people
+from apps.chat.tests.fixtures import people
 
 pytestmark = pytest.mark.django_db
 URL = '/api/v1/chat/announcements/'
@@ -24,7 +24,7 @@ PUBLISHERS = '/api/v1/chat/announcement-publishers/'
 
 @pytest.fixture
 def manager(people):
-    return people.user('manager', role='agency_manager')
+    return people.manager
 
 
 @pytest.mark.parametrize('role', User.Role.values)

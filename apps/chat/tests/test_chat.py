@@ -13,7 +13,7 @@ from rest_framework.test import APIClient
 
 from apps.accounts.models import User
 from apps.notifications.models import Notification
-from apps.tasks.tests.conftest import people
+from apps.chat.tests.fixtures import people
 from common.jalali import schedule
 from apps.chat.models import Conversation, Message, _CHAT_WRITE
 from apps.chat.services import open_conversation, send_message, mark_conversation_read, notify_message

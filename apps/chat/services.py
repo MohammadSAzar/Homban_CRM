@@ -7,15 +7,15 @@ from django.db.models import Case, Count, DateTimeField, ExpressionWrapper, F, O
 from django.db.models.functions import Coalesce, Substr
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
-from rest_framework.exceptions import NotFound, PermissionDenied, ValidationError
+from rest_framework.exceptions import NotFound, ValidationError
 
-from apps.accounts.authentication import customer_can_authenticate
 from apps.accounts.models import User
 from apps.notifications.models import Notification
 from apps.notifications.services import publish_notification
 from apps.organizations.models import Workspace
 from .models import Conversation, Message, MAX_TEXT_LENGTH, _CHAT_WRITE
 from .attachments import attachment_path, validate_upload, AttachmentUnavailable
+from .policies import require_chat_access
 
 logger = logging.getLogger(__name__)
 
@@ -25,8 +25,7 @@ def lock_actor(actor):
     user = User.objects.select_for_update().filter(pk=actor.pk, workspace=workspace).first() if workspace else None
     if user is not None:
         user.workspace = workspace
-    if not customer_can_authenticate(user) or user.role not in User.Role.values:
-        raise PermissionDenied(_('دسترسی به گفتگو مجاز نیست.'))
+    require_chat_access(user)
     return user
 
 

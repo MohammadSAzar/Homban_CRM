@@ -18,7 +18,7 @@ from apps.chat.realtime import TICKET_SALT, create_ticket, group_name
 from apps.chat.services import open_conversation, send_message
 from apps.chat.tests.test_chat import client, URL
 from apps.notifications.models import Notification
-from apps.tasks.tests.conftest import people
+from apps.chat.tests.fixtures import people
 from common.jalali import schedule
 
 pytestmark = pytest.mark.django_db(transaction=True)

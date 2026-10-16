@@ -846,8 +846,9 @@ waveform, recording frontend, antivirus, video, multi-attachment or background m
 ## Internal Chat Phase 4A — Announcement Channel Foundation
 
 One logical official channel per Workspace is now available through GET/POST
-`/api/v1/chat/announcements/`. All active customer roles may read; Agency Managers publish
-by default. Only they manage GET/POST `/api/v1/chat/announcement-publishers/` and DELETE
+`/api/v1/chat/announcements/`. All active customer roles may read when Chat is Team-capable;
+current Workspace Chat authorities publish by default. Only they manage
+GET/POST `/api/v1/chat/announcement-publishers/` and DELETE
 `/api/v1/chat/announcement-publishers/<uuid>/`. Delegation is idempotent and limited to active
 same-Workspace Range Managers/Secretaries. Current role/activity/membership is rechecked;
 retained invalid delegations confer no access. Admin/Consultant and owner/staff flags grant
@@ -881,3 +882,29 @@ callback failure is logged without invalidating durable publication. REST histor
 Center remain recovery sources. Text commands are rejected safely; binary input closes.
 No socket writes, read-state mutation, replay/outbox/backfill, receipts, General Group, media
 or frontend. No migrations/dependencies or private Conversation consumer changes.
+
+
+### Chat Team-only compatibility policy (Phase 4A.2)
+
+Chat requires an active Workspace with at least one active Agency Manager or Range
+Manager. Without either role, every Chat surface is denied: private history, sends,
+read actions, attachments/voice, announcement history/publishing/delegation, both
+realtime tickets, socket connections and deliveries. Historical records and Notifications
+are retained; normal access can resume when the Workspace becomes Team-capable.
+
+`apps.chat.policies` centralizes the policy at the existing Workspace-first `lock_actor`
+boundary. Current active Agency Managers are equal Workspace Chat authorities. Only when
+none exist do all active Range Managers inherit publishing and delegation administration.
+An Agency Manager appearing immediately removes Range Managers' implicit global authority;
+valid retained publisher delegation can still allow them to publish, but not administer.
+Removing/deactivating the final Agency Manager restores Range Manager authority if one
+remains. No manager means Chat is unavailable. Every request/socket recheck reads current
+DB topology; no cached ticket claim grants continued access.
+
+Delegation remains limited to active same-Workspace Range Managers/Secretaries and is not
+needed for current authorities. Existing delegation rows are preserved until explicit
+revocation. Authority never grants access to another user's private conversation.
+`customer_type`, workspace ownership, staff and superuser flags grant no Chat authority.
+No schema, dependency, ticket/protocol or notification/read lifecycle change is introduced.
+This is Chat-only compatibility; permanent repository-wide Personal/Team design and
+General Group remain deferred.
