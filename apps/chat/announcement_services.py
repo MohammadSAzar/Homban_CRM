@@ -70,6 +70,8 @@ def publish_announcement(*, actor, text):
     row = Announcement(workspace=actor.workspace, author=actor, text=text.strip())
     row.save(_token=_CHAT_WRITE)
     _notify_announcement(row)
+    from .announcement_realtime import schedule_announcement
+    schedule_announcement(row)
     return row
 
 

@@ -1263,8 +1263,40 @@ is a new Announcement; retrying a notification for the same Announcement is dedu
 Migrations chat/0004_announcements and notifications/0002_announcements add the two models
 and Notification kind/constraint only. Standard service-only ORM guards apply; raw SQL/base
 QuerySet bypasses are privileged internal operations, not supported application write paths.
-No dependencies were added. Announcement realtime is deferred to Phase 4A.1: a separate
-purpose-bound ticket and Workspace subscription authorization surface is needed; private
-Conversation sockets are unchanged. REST history and Notification Center are available now.
+No dependencies were added. Phase 4A.1 below adds separate purpose-bound realtime delivery;
+private Conversation sockets remain unchanged. REST history and Notification Center remain
+available independently of realtime.
 No General Group, replies, threads, comments, reactions, media, mentions, targeting, receipts,
 pinning, scheduling, edit/delete or frontend is implemented by this phase.
+
+### Phase 4A.1 — read-only announcement realtime
+
+POST an empty object to `/api/v1/chat/announcements/realtime-ticket/` with normal customer
+authentication. The no-store response contains a 90-second signed bearer ticket bound to
+user, Workspace and `purpose=announcement`, using salt `homban.chat.announcements.websocket.v1`.
+Private Conversation tickets are not interchangeable. No JWT/body/contact data is in the ticket.
+All active customer roles may subscribe; publisher delegation is not required.
+
+`/ws/chat/announcements/?ticket=...` joins only `chat.announcements.<workspace_uuid_hex>`.
+The existing explicit Chat origin allowlist applies; an empty allowlist denies connections.
+Use WSS and redact ticket query strings from access logs as with private Chat. Handshake
+expiry is 90 seconds; established sockets instead recheck current authorization on every event.
+The dedicated consumer reloads current active user/Workspace/role on connect and each delivery,
+and loads only an Announcement belonging to that Workspace. Revoked membership closes with
+4403 before payload delivery. Moved author identity follows the existing REST privacy rule.
+
+The existing publish service schedules exactly one robust on_commit callback after all
+Notifications succeed. Only the outermost commit triggers delivery; rollback emits nothing.
+Internal events contain type, Workspace ID and Announcement ID only. Consumers reload and
+return `{"type":"chat.announcement","announcement":<announcement_data>}` with exactly the
+REST-safe identity/text/Jalali representation and no Workspace field or raw Gregorian time.
+Publisher sockets may receive the event although publisher Notifications remain excluded.
+No new Announcement/Notification/read-state write occurs in the socket.
+
+Text input returns a safe Persian unsupported-command error; binary input closes with 1008.
+REST remains the only announcement write path. Disconnect removes group membership.
+Redis connection/timeouts log a safe warning; unexpected callbacks use Django's robust
+logging. Delivery failures cannot undo committed Announcements or Notifications. Delivery
+is best-effort: REST history and Notification Center remain recovery sources, with no replay,
+outbox, durable event log, reconnect backfill, receipt, targeting or General Group. No schema,
+dependency, origin setting or private Conversation consumer changes are introduced.

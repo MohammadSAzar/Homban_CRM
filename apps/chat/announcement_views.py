@@ -47,3 +47,13 @@ class PublisherDetailView(APIView):
         validate(EmptySerializer, request.data)
         remove_publisher(actor=request.user, delegation_id=pk)
         return Response(status=204)
+
+
+class AnnouncementTicketView(APIView):
+    def post(self, request):
+        validate(EmptySerializer, request.query_params.dict())
+        validate(EmptySerializer, request.data)
+        from .announcement_realtime import create_ticket
+        response = Response({'ticket': create_ticket(actor=request.user)})
+        response['Cache-Control'] = 'no-store'
+        return response

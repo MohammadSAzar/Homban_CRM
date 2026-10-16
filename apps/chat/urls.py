@@ -1,8 +1,9 @@
 from django.urls import path
 from .views import AttachmentView, ConversationDetailView, ConversationListView, ConversationReadView, MessageListView, RealtimeTicketView
-from .announcement_views import AnnouncementListView, PublisherListView, PublisherDetailView
+from .announcement_views import AnnouncementListView, PublisherListView, PublisherDetailView, AnnouncementTicketView
 
 urlpatterns = [
+    path('chat/announcements/realtime-ticket/', AnnouncementTicketView.as_view(), name='chat-announcement-ticket'),
     path('chat/announcements/', AnnouncementListView.as_view(), name='chat-announcements'),
     path('chat/announcement-publishers/', PublisherListView.as_view(), name='chat-announcement-publishers'),
     path('chat/announcement-publishers/<uuid:pk>/', PublisherDetailView.as_view(), name='chat-announcement-publisher'),

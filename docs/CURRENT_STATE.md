@@ -861,6 +861,23 @@ author, in 100-recipient keyset batches using existing publication/deduplication
 back the entire publish. No announcement body/contact data enters Notification summaries.
 
 Migrations: chat/0004_announcements and notifications/0002_announcements. No new dependency.
-Announcement realtime is deferred to Phase 4A.1 to keep separate ticket/subscription security
-out of this small foundation. No General Group, replies/discussion, threads, reactions, media,
+Announcement realtime is added separately in Phase 4A.1 below.
+No General Group, replies/discussion, threads, reactions, media,
 targeting, receipts, edit/delete, pinning, scheduling or frontend is added.
+
+## Internal Chat Phase 4A.1 — Announcement Realtime Delivery
+
+POST `/api/v1/chat/announcements/realtime-ticket/` issues a no-store 90-second signed ticket
+for user/Workspace/announcement purpose, with a distinct signing salt from private Chat.
+`/ws/chat/announcements/?ticket=...` is read-only, available to all current active customer
+roles in an active Workspace; no publisher permission is required. The existing Chat origin
+allowlist applies. Both connect and each delivery recheck current authoritative membership,
+activity and role. Announcement ID lookup is Workspace-scoped before REST-safe serialization.
+
+The sole publish service schedules ID-only Workspace fanout after outermost commit, following
+successful atomic Notifications. Rollback emits nothing. Publisher sockets also receive events.
+The event reuses announcement_data with Jalali time and safe professional identity. Redis or
+callback failure is logged without invalidating durable publication. REST history/Notification
+Center remain recovery sources. Text commands are rejected safely; binary input closes.
+No socket writes, read-state mutation, replay/outbox/backfill, receipts, General Group, media
+or frontend. No migrations/dependencies or private Conversation consumer changes.

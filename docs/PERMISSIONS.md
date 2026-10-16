@@ -495,4 +495,16 @@ are omitted from retained history/delegation responses. Announcement body is vis
 its original Workspace, never copied into Notifications. Generic notifications go atomically
 to current eligible members except publisher, using recipient-scoped event deduplication.
 GET changes no read state. Announcement edits/deletes, media, targeting and read receipts
-are unavailable. No announcement WebSocket exists yet; realtime is deferred to Phase 4A.1.
+are unavailable. Phase 4A.1 adds the read-only announcement WebSocket described below.
+
+### Announcement realtime (Phase 4A.1)
+All active customer roles can request the empty-body announcement realtime-ticket POST and
+subscribe to their Workspace stream, independently of publishing permission. A distinct signed
+90-second user/Workspace/purpose ticket is mandatory; private Conversation tickets and raw JWT
+query parameters are rejected. Existing Chat origin allowlisting applies and fails closed empty.
+Current user activity, Workspace membership/activity and valid role are rechecked on connect
+and every delivery; staff/owner flags grant no bypass. Event IDs are verified against the same
+Workspace before REST-safe Announcement serialization, including moved-author privacy.
+Announcement sockets cannot publish, delegate or mutate read state. Publisher may receive
+realtime while still receiving no self-Notification. Delivery is after commit and best-effort;
+REST history and Notification Center remain independent recovery sources. No replay or receipts.
