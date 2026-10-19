@@ -35,3 +35,13 @@ class GeneralGroupSettingsView(APIView):
         validate(EmptySerializer, request.query_params.dict())
         data = validate(GeneralGroupSettingsInput, request.data)
         return Response(set_general_group_enabled(actor=request.user, **data))
+
+
+class GeneralGroupTicketView(APIView):
+    def post(self, request):
+        from .general_group_realtime import create_ticket
+        validate(EmptySerializer, request.query_params.dict())
+        validate(EmptySerializer, request.data)
+        response = Response({'ticket': create_ticket(actor=request.user)})
+        response['Cache-Control'] = 'no-store'
+        return response

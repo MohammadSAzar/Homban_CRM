@@ -942,3 +942,40 @@ No group Notifications, unread/read markers, receipts, membership rows or GET mu
 No realtime/tickets/Channels fanout (deferred to Phase 4B.1), media, replies, reactions,
 edit/delete, targeting, custom groups, moderation or frontend. The permanent repository-wide
 Personal/Team redesign remains deferred; no workspace_mode or organization schema changes.
+
+
+### Internal Chat Phase 4B.1 — General Group Realtime Delivery
+
+POST an empty object to `/api/v1/chat/general-group/realtime-ticket/` for a no-store
+90-second signed ticket containing only user, Workspace and purpose=general_group.
+Salt `homban.chat.general-group.websocket.v1` is distinct from private and announcement
+salts; tickets cannot be exchanged between these surfaces. No raw JWT travels in the URL.
+`/ws/chat/general-group/?ticket=...` uses the existing Chat origin allowlist (empty denies)
+and deterministic `chat.general-group.<workspace_uuid_hex>` group. Keep ticket query strings
+out of access logs, as for other Chat sockets.
+
+Current active customer membership, active Workspace, Team Chat availability and enabled
+General Group are checked at ticket issuance, connect, every send and every delivery.
+Disabling the group, losing the final manager, deactivation or moving Workspace revokes
+access at the next check (4403); retained history/settings are unchanged. Re-enable or
+Team restoration allows a fresh ticket/reconnection, not revival of a closed socket.
+No owner/staff/superuser/customer_type bypass is introduced.
+
+The only socket command is `{"type":"chat.general_group.send","text":"..."}` with no
+extra fields. The async DB bridge delegates to the same authoritative General Group send
+service as REST. `chat.general_group.send.ack` contains only message_id besides event type,
+and confirms durable creation, not delivery/read. Expected invalid input returns safe Persian
+errors while keeping the connection open; binary input closes with 1008. Settings remain
+REST-only. Message validation and persistence remain in the existing domain service.
+
+One robust after-outermost-commit callback emits only event type, Workspace ID and message
+ID internally. Rollback emits nothing. Each socket reauthorizes and reloads the message in
+its ticket Workspace before using the exact REST general_group_message_data representation:
+`chat.general_group.message` with message id/text/safe sender (or null after a move)/Jalali
+display time. Sender sockets may receive the same event; foreign Workspaces cannot.
+Redis failure does not invalidate durable sends or ACKs; safe failure logging and REST
+history provide best-effort recovery. There is no replay/outbox/backfill.
+
+No Notifications, read/unread state, receipts, membership, media, settings commands, schema
+or dependency changes. Private/announcement protocols and centralized Chat authority remain
+unchanged; the broader Personal/Team redesign remains deferred.

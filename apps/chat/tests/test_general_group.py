@@ -238,7 +238,7 @@ def test_no_extra_endpoints_or_anonymous_access(people):
         assert getattr(api, method)(SETTINGS).status_code == 405
     for method in ('patch', 'put', 'delete'):
         assert getattr(api, method)(URL).status_code == 405
-    assert api.post(URL + 'realtime-ticket/', {}, format='json').status_code == 404
+    assert api.post(URL + 'realtime-ticket/', {}, format='json').status_code == 403
 
 
 def test_disabled_group_does_not_change_private_chat_or_announcements(people):

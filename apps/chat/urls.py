@@ -1,9 +1,10 @@
 from django.urls import path
 from .views import AttachmentView, ConversationDetailView, ConversationListView, ConversationReadView, MessageListView, RealtimeTicketView
 from .announcement_views import AnnouncementListView, PublisherListView, PublisherDetailView, AnnouncementTicketView
-from .general_group_views import GeneralGroupView, GeneralGroupSettingsView
+from .general_group_views import GeneralGroupView, GeneralGroupSettingsView, GeneralGroupTicketView
 
 urlpatterns = [
+    path('chat/general-group/realtime-ticket/', GeneralGroupTicketView.as_view(), name='chat-general-group-ticket'),
     path('chat/general-group/', GeneralGroupView.as_view(), name='chat-general-group'),
     path('chat/general-group/settings/', GeneralGroupSettingsView.as_view(), name='chat-general-group-settings'),
     path('chat/announcements/realtime-ticket/', AnnouncementTicketView.as_view(), name='chat-announcement-ticket'),

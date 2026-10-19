@@ -134,7 +134,8 @@ General group:
 - Without either active manager role, Personal/consultant-only Workspaces have no Chat.
   Customer type and workspace ownership do not grant Chat authority.
 - The Phase 4B foundation is text-only REST history/sending, disabled by default;
-  disabling retains history. General Group realtime is deferred to Phase 4B.1.
+  disabling retains history. Phase 4B.1 adds realtime delivery and WebSocket text sending
+  through the same service; REST history remains recovery. No group Notifications/read state.
 
 Content:
 - Text

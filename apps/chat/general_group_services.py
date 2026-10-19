@@ -41,20 +41,27 @@ def _require_enabled(actor):
         raise PermissionDenied(_('گروه عمومی فعال نیست.'))
 
 
-def list_general_group_messages(actor):
-    # The view retains its Workspace-first transaction through pagination/serialization.
+def require_general_group_access(actor):
+    """Current-state boundary, called inside a Workspace-first transaction."""
     actor = lock_actor(actor)
     _require_enabled(actor)
+    return actor
+
+
+def list_general_group_messages(actor):
+    # The view retains its Workspace-first transaction through pagination/serialization.
+    actor = require_general_group_access(actor)
     return GeneralGroupMessage.objects.filter(workspace_id=actor.workspace_id).select_related(
         'sender').order_by('created_at', 'pk')
 
 
 @transaction.atomic
 def send_general_group_message(*, actor, text):
-    actor = lock_actor(actor)
-    _require_enabled(actor)
+    actor = require_general_group_access(actor)
     if not isinstance(text, str) or not text.strip() or len(text.strip()) > MAX_TEXT_LENGTH:
         raise ValidationError({'text': _('متن پیام الزامی و حداکثر ۴۰۰۰ نویسه است.')})
     row = GeneralGroupMessage(workspace=actor.workspace, sender=actor, text=text.strip())
     row.save(_token=_CHAT_WRITE)
+    from .general_group_realtime import schedule_message
+    schedule_message(row)
     return row
