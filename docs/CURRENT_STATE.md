@@ -30,9 +30,20 @@ this does not claim a completed frontend or production deployment.
 
 Current authorization remains transitional: Chat uses active manager presence, not
 workspace_mode; Collaboration and cross-consultant Matching are not centrally Team-gated.
-Repository-wide Workspace Authority, canonical Team topology enforcement, central
+Workspace Authority consumer migration, canonical Team topology enforcement, central
 capabilities and final mode NOT NULL enforcement remain future work. Legacy owner
 privileges in Location/Range policies have not been removed.
+
+### Phase C1 — Workspace Authority resolver foundation
+`apps.organizations.authority.resolve_workspace_authority` now provides an immutable
+resolution (status, authority_user, topology, reason) without authorizing endpoints.
+Personal returns legitimate no authority; unresolved mode and invalid Team topology
+fail closed. Only active Ranges count: one valid Range resolves its current active
+same-Workspace Range Manager; multiple valid Ranges require exactly one active local
+Agency Manager. Invalid/missing managers or zero active Ranges return invalid. Current
+DB state is reloaded; purchaser/owner/staff flags never select authority. No writes,
+topology repairs, schema changes or runtime consumer integration are introduced.
+Existing domain permissions, including Chat's compatibility policy, remain unchanged.
 
 The sections below include historical phase verification totals and implementation detail;
 older phase exclusions do not mean later completed features are absent.
@@ -540,7 +551,7 @@ login rate limiting, and signing-key operations need deployment decisions. This
 foundation uses Django's environment-backed secret as SimpleJWT's default signing key.
 
 ## Not yet implemented
-- Central Workspace Authority, Team topology invariants and mode-based capability enforcement
+- Workspace Authority consumer integration, Team topology invariants and mode-based capability enforcement
 - Final workspace_mode NOT NULL enforcement after explicit classification
 - Recurring reminders / external calendar integration
 - Frontend task/calendar components

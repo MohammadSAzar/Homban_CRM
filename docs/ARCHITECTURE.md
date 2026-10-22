@@ -77,7 +77,7 @@ preserving purchaser `customer_type` metadata. The expand migration allows NULL
 only for unresolved classification, with no product-mode default or heuristic
 backfill. New application creation uses the small organization-layer
 `create_workspace` service and requires an explicit mode. No customer mode-edit
-API is added. Existing runtime permissions remain unchanged; central authority,
+API is added. Existing runtime permissions remain unchanged; authority consumer migration,
 capabilities, topology enforcement, and final non-null enforcement are deferred.
 See [ADR 0004](decisions/0004-workspace-product-mode.md).
 
@@ -96,6 +96,19 @@ Typical query flow:
 5. Apply field-level serialization restrictions
 
 ## Planned authority and capability layers
+The C1 foundation now exists in `apps.organizations.authority`: read-only
+`resolve_workspace_authority(workspace)` returns a frozen result with status
+(`resolved`/`none`/`invalid`), authority_user, topology and an internal reason code.
+It reloads Workspace mode and considers active same-Workspace Ranges only. Personal
+returns none even with legacy teams; NULL fails closed. Team requires valid active
+same-Workspace Range Managers for every operational Range. One Range resolves its
+manager regardless of Agency Manager presence; multiple Ranges require exactly one
+active same-Workspace Agency Manager. Zero active Ranges or malformed topology is invalid.
+Repeated Range managers remain schema-permitted; no topology is repaired or enforced.
+No purchaser/owner/staff fallback, writes, caching or consumer migration is introduced.
+This resolver is not endpoint authorization or a Workspace activation check. Consumers
+must retain access checks and use their Workspace-locked transaction when needed.
+
 Keep tenant isolation, purchaser metadata, product mode and operational authority separate.
 Personal is one consultant with Core capabilities. Team-only and topology-dependent
 features are classified in PRODUCT; their central backend capability layer is not built.
@@ -110,7 +123,8 @@ never grants operational authority; future authority cannot override private obj
 boundaries documented in PERMISSIONS.
 
 Migration remains incremental: B1 mode foundation and B2a read-only context are complete;
-B2b aligns documentation. Next come central Workspace Authority (C), topology invariants
+B2b aligns documentation. C1 adds the unwired resolver; next come authority consumer migration,
+topology invariants
 (D), and capabilities (E), followed by focused feature refactors (F): Chat, Collaboration,
 Matching scopes, Daily Tasks projection, User/Range management, Notification producers,
 File/Customer scopes, Location taxonomy authority, then remaining admin-facing permissions.
