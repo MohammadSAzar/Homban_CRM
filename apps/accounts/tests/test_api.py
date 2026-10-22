@@ -112,13 +112,14 @@ def test_me_returns_only_current_customer_data(client, customer):
         "last_name": "احمدی", "phone_number": "09120000000", "role": "consultant",
         "role_display": "مشاور", "is_workspace_owner": True,
         "workspace_id": str(customer.workspace_id), "workspace_name": "املاک نمونه",
+        "workspace_mode": None,
     }
     assert customer.password not in response.content.decode()
 
 
 def test_me_uses_current_database_role_and_workspace(client, customer):
     tokens = login(client, customer).data
-    workspace = Workspace.objects.create(name="مجموعه جدید", slug="new", customer_type="consultant")
+    workspace = Workspace.objects.create(name="مجموعه جدید", slug="new", customer_type="consultant", workspace_mode="team")
     User.objects.filter(pk=customer.pk).update(role="secretary", workspace=workspace, is_workspace_owner=False)
     client.credentials(HTTP_AUTHORIZATION="Bearer " + tokens["access"])
     response = client.get(reverse("accounts:me"))
@@ -127,6 +128,33 @@ def test_me_uses_current_database_role_and_workspace(client, customer):
     assert response.data["role_display"] == "منشی"
     assert response.data["workspace_id"] == str(workspace.pk)
     assert response.data["is_workspace_owner"] is False
+    assert response.data["workspace_mode"] == "team"
+
+
+@pytest.mark.parametrize("mode", ["personal", "team", None])
+def test_me_exposes_current_mode_independently_of_purchaser(client, customer, mode):
+    tokens = login(client, customer).data
+    client.credentials(HTTP_AUTHORIZATION="Bearer " + tokens["access"])
+    for customer_type in Workspace.CustomerType.values:
+        Workspace.objects.filter(pk=customer.workspace_id).update(
+            workspace_mode=mode, customer_type=customer_type,
+        )
+        response = client.get(reverse("accounts:me"))
+        assert response.status_code == 200
+        assert response.data["workspace_mode"] == mode
+
+
+def test_mode_cannot_be_changed_through_login_or_me(client, customer):
+    response = client.post(reverse("accounts:login"), {
+        "username": customer.username, "password": "Test-password-123!",
+        "workspace_mode": "team",
+    }, format="json")
+    assert response.status_code == 200
+    client.credentials(HTTP_AUTHORIZATION="Bearer " + response.data["access"])
+    for method in (client.patch, client.put):
+        assert method(reverse("accounts:me"), {"workspace_mode": "team"}, format="json").status_code == 405
+    customer.workspace.refresh_from_db()
+    assert customer.workspace.workspace_mode is None
 
 
 def test_anonymous_me_is_denied(client):

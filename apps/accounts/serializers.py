@@ -49,11 +49,13 @@ class CurrentUserSerializer(serializers.ModelSerializer):
     role_display = serializers.CharField(source="get_role_display", read_only=True)
     workspace_id = serializers.UUIDField(read_only=True)
     workspace_name = serializers.CharField(source="workspace.name", read_only=True)
+    workspace_mode = serializers.CharField(source="workspace.workspace_mode", read_only=True, allow_null=True)
 
     class Meta:
         model = User
         fields = (
             "id", "username", "first_name", "last_name", "phone_number", "role",
             "role_display", "is_workspace_owner", "workspace_id", "workspace_name",
+            "workspace_mode",
         )
         read_only_fields = fields
