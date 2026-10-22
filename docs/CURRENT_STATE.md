@@ -1,5 +1,22 @@
 # Homban Current Implementation State
 
+## Product Mode Foundation — Phase B1
+`Workspace.workspace_mode` now records `personal` / `team`, independently from
+unchanged purchaser `customer_type`. Migration `organizations/0004_workspace_mode`
+adds the nullable field and `workspace_valid_product_mode` check constraint only.
+Existing Workspaces remain NULL/unresolved; no automatic classification occurs.
+NULL is a temporary migration state, not a product mode; there is no personal/team
+default. Final non-null enforcement awaits an approved inventory/classification.
+
+New application creation must use `organizations.services.create_workspace` with
+explicit valid mode and purchaser type. It creates no users or Ranges. No production
+provisioning path or registered Workspace admin existed; full provisioning remains
+future work. Direct ORM fixtures remain compatible. No customer mode-edit endpoint,
+inventory command, permission changes, owner-flag changes, or feature gates are added.
+Chat, Matching, Collaboration, Daily Tasks, and other feature behavior is unchanged.
+The read-only inventory procedure and migration contract are in
+[ADR 0004](decisions/0004-workspace-product-mode.md).
+
 This document describes workspace-scoped authentication, organizational user management,
 location configuration, Range Management, PropertyFile and Customer APIs, and PropertyFile/Customer
 domain foundations on 2026-09-24.

@@ -10,6 +10,12 @@ The product is designed to be sold to one of three buyer types:
 
 The same core product must support all three cases.
 
+Purchaser identity is separate from product classification: the canonical modes
+are Personal and Team. Phase B1 stores this explicitly without inferring it from
+buyer type or changing existing feature permissions. Full product/permission
+documentation alignment follows in later phases; see
+[ADR 0004](decisions/0004-workspace-product-mode.md).
+
 ## Workspace model
 Each purchase creates an isolated Homban workspace with:
 - A dedicated address/subdomain or equivalent route

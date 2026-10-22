@@ -72,6 +72,15 @@ Secrets belong in environment variables.
 ## Workspace isolation
 Homban uses one codebase with multiple customer workspaces.
 
+Phase B1 adds explicit `Workspace.workspace_mode` (`personal` / `team`) while
+preserving purchaser `customer_type` metadata. The expand migration allows NULL
+only for unresolved classification, with no product-mode default or heuristic
+backfill. New application creation uses the small organization-layer
+`create_workspace` service and requires an explicit mode. No customer mode-edit
+API is added. Existing runtime permissions remain unchanged; central authority,
+capabilities, topology enforcement, and final non-null enforcement are deferred.
+See [ADR 0004](decisions/0004-workspace-product-mode.md).
+
 Every workspace-owned business entity must be isolated by workspace.
 
 The backend must never rely on frontend filtering for tenant isolation.

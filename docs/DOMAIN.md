@@ -8,7 +8,13 @@ A workspace may represent:
 - A range/team bought independently
 - An individual consultant
 
-The business-facing experience adapts to the buyer type, but the core platform remains shared.
+Purchaser type is commercial metadata, not runtime product mode. Phase B1 adds
+`Workspace.workspace_mode`: `personal` / `team`, independent of `customer_type`.
+The nullable expand state means classification is unresolved, not a third mode.
+Existing rows are not inferred or backfilled. New application creation uses
+`organizations.services.create_workspace` with an explicit mode. No permissions
+or topology change in B1; later phases migrate those policies. See
+[ADR 0004](decisions/0004-workspace-product-mode.md).
 
 ## User roles
 Customer usernames are unique within their Workspace. The same username may exist
