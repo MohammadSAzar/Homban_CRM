@@ -15,7 +15,10 @@ Before implementing any non-trivial feature, read:
 For architectural changes, also inspect `docs/decisions/`.
 
 ## Product rules
-- Homban is sold as a dedicated CRM workspace to a real-estate agency, a range manager, or an individual consultant.
+- Canonical product modes are Personal (one consultant) and Team (one or more Range teams).
+- `customer_type` is purchaser/commercial metadata, not runtime mode or authority.
+- `workspace_mode` stores personal/team; NULL is unresolved classification, not a third mode. No default or heuristic inference applies.
+- `is_workspace_owner` identifies the purchaser/primary account, not target operational authority. Legacy owner privileges remain pending focused refactors.
 - Each customer operates inside an isolated `Workspace`.
 - Never leak data across workspaces.
 - The organizational hierarchy may include:
@@ -24,12 +27,13 @@ For architectural changes, also inspect `docs/decisions/`.
   - Consultant
   - Secretary
   - Admin
-- Range/team structure is optional.
-- A consultant may work without belonging to a range.
+- Target Team requires operational Ranges: one Range uses its Range Manager as Workspace authority; multiple Ranges use a Workspace-level Agency Manager above managed teams.
+- Personal has no operational team structure. Current schema permits legacy states; central Workspace Authority and topology enforcement remain future work.
+- Classify features as Core, Team-only, or Topology-dependent Team. Team-only features require backend capability enforcement when migrated; mode storage and read-only exposure alone do not gate features.
 - Files are either sale or rent.
 - Customers are either buyer or tenant.
 - Files and customers are assigned to consultants.
-- Matching must support cross-consultant collaboration ("pass").
+- Own matching is Core; cross-consultant matching/pass and Chat are Team-only targets. Central mode-based capability migration is not yet complete.
 - Contact information on records not owned by the requesting consultant must not be exposed unless explicitly permitted.
 
 ## Language and UI rules

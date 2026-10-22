@@ -29,7 +29,11 @@ HombanCRM/
 │   ├── locations/
 │   ├── ranges/
 │   ├── properties/
-│   └── customers/
+│   ├── customers/
+│   ├── matching/
+│   ├── tasks/
+│   ├── chat/
+│   └── notifications/
 ├── common/
 ├── config/
 │   └── settings/
@@ -40,26 +44,22 @@ HombanCRM/
 ```
 
 Future apps may include:
-- matching
-- tasks
 - deals
-- chat
-- notifications
 - imports/integrations
 - audit/logging
 
 Do not create apps only because they are listed here. Create them when the domain boundary is ready.
 
 `properties` contains the PropertyFile domain models and atomic aggregate-creation
-service, without REST endpoints. File-owned image references and valuable-reason
+service and operational REST endpoints. File-owned image references and valuable-reason
 rows have no duplicated workspace field: their parent is the isolation boundary.
 Business references use PROTECT to retain file history. See DOMAIN for fields,
 validation limits, monetary units and the UUID-derived display code.
 
 `customers` holds Customer, customer-specific valuable reasons and an explicit Region
 preference through model. Model and M2M guards enforce cross-table integrity; internal
-transactional services follow the existing Workspace lock order. No Customer API or
-Matching implementation is included.
+transactional services follow the existing Workspace lock order. Customer REST APIs
+and Matching are implemented; their contracts are described in DOMAIN.
 
 ## Settings
 Settings are split into:
@@ -81,6 +81,9 @@ API is added. Existing runtime permissions remain unchanged; central authority,
 capabilities, topology enforcement, and final non-null enforcement are deferred.
 See [ADR 0004](decisions/0004-workspace-product-mode.md).
 
+B2a exposes workspace_mode read-only in GET `/api/v1/auth/me/` as personal/team/null,
+from the current Workspace row. No fallback or authorization behavior is attached.
+
 Every workspace-owned business entity must be isolated by workspace.
 
 The backend must never rely on frontend filtering for tenant isolation.
@@ -91,6 +94,29 @@ Typical query flow:
 3. Apply role/organizational scope
 4. Apply object-level restrictions
 5. Apply field-level serialization restrictions
+
+## Planned authority and capability layers
+Keep tenant isolation, purchaser metadata, product mode and operational authority separate.
+Personal is one consultant with Core capabilities. Team-only and topology-dependent
+features are classified in PRODUCT; their central backend capability layer is not built.
+Target Team has one or more Ranges: single-team authority is the Range Manager;
+multi-team authority is an Agency Manager above managed teams. Current schema permits
+legacy states and does not enforce these invariants.
+
+The current apps.chat.policies manager-presence gate is a temporary Chat-only policy.
+It neither reads workspace_mode nor establishes a central Workspace Authority resolver.
+Other domains retain role/scope rules and some owner privileges. Target owner identity
+never grants operational authority; future authority cannot override private object
+boundaries documented in PERMISSIONS.
+
+Migration remains incremental: B1 mode foundation and B2a read-only context are complete;
+B2b aligns documentation. Next come central Workspace Authority (C), topology invariants
+(D), and capabilities (E), followed by focused feature refactors (F): Chat, Collaboration,
+Matching scopes, Daily Tasks projection, User/Range management, Notification producers,
+File/Customer scopes, Location taxonomy authority, then remaining admin-facing permissions.
+Review data/backward compatibility before final architecture verification. Explicit legacy
+classification and verified provisioning must precede final NOT NULL enforcement.
+No big-bang permission rewrite or heuristic mode inference is part of this plan.
 
 ## Company control plane
 Customer credential lookup is scoped by workspace. A reusable resolver in

@@ -3,17 +3,17 @@
 ## Core aggregate: Workspace
 A `Workspace` is the isolation boundary for one Homban customer installation.
 
-A workspace may represent:
-- A whole agency
-- A range/team bought independently
-- An individual consultant
+Commercial purchasers may be an agency, a Range Manager or an individual consultant.
+Purchaser identity does not determine operational topology or capability.
 
 Purchaser type is commercial metadata, not runtime product mode. Phase B1 adds
 `Workspace.workspace_mode`: `personal` / `team`, independent of `customer_type`.
 The nullable expand state means classification is unresolved, not a third mode.
 Existing rows are not inferred or backfilled. New application creation uses
 `organizations.services.create_workspace` with an explicit mode. No permissions
-or topology change in B1; later phases migrate those policies. See
+or topology change in B1; later phases migrate those policies. B2a exposes the current
+Workspace value read-only in GET `/api/v1/auth/me/` (personal/team/null), without gating
+authentication or features. See
 [ADR 0004](decisions/0004-workspace-product-mode.md).
 
 ## User roles
@@ -30,10 +30,20 @@ Current roles:
 - `admin` — ادمین
 
 The workspace purchaser/primary user is not a role.
-Use a separate concept such as `is_workspace_owner`.
+The existing `is_workspace_owner` identifies that primary account only in the target.
+Some current APIs retain legacy owner privileges (notably Location configuration and
+Range reads); their removal is deferred, not completed by product-mode exposure.
 
-## Organization
-A workspace may have zero or more ranges.
+## Organization — target and current schema
+Target Personal is one consultant with no operational Range/team semantics. Target Team
+requires at least one operational Range. Single-team authority is its Range Manager;
+no Agency Manager is required. Multi-team has managed Ranges under one Workspace-level
+Agency Manager. Central Workspace Authority and topology enforcement remain future work;
+changing Range count does not change product mode.
+
+The current schema permits zero or more Ranges, nullable managers and consultants without
+membership. The following API descriptions record current implementation, including legacy
+Agency Manager/owner rules, not the final Personal/Team policy.
 
 A range:
 - Belongs to one workspace
@@ -100,7 +110,7 @@ so one user may manage multiple Ranges. This API preserves that schema and permi
 such assignments, with no uniqueness migration. Range managers can read their
 assigned Ranges, but membership writes retain User Management's requirement of
 exactly one active same-workspace managed Range; ambiguous states fail safely.
-Changing this cardinality requires a future explicit product decision.
+Topology enforcement must reconcile this legacy cardinality explicitly; B2b changes no model invariant.
 
 Agency managers add/remove consultants and explicitly move them between Ranges.
 Range managers may add an unassigned same-workspace consultant to their one active
@@ -136,6 +146,10 @@ Reactivation is explicit; there is no hard-delete Range endpoint. Existing model
 constraints and the Range.regions M2M workspace guard remain unchanged.
 
 ## Location
+Geography remains Workspace-wide and Core-capable in both modes. Range.regions constrains
+a team; it is not a future consultant territory/work-area identity. Location authority is
+a later permission refactor, not a geography redesign.
+
 Conceptual hierarchy:
 - City
 - Region
@@ -280,7 +294,7 @@ total_price and building_age are future Matching/filter candidates; additional i
 await actual query plans rather than speculative independent numeric indexes.
 Location, transaction, characteristics and prices may inform future Matching. Address,
 description, owner/visit contact data, sources, images and valuable reasons remain
-first-class CRM data regardless of future Matching use. Matching remains future work.
+first-class CRM data regardless of Matching use. Implemented Matching is described below.
 
 #### PropertyFile operational API
 `/api/v1/property-files/` supports paginated GET and POST; `/<uuid>/` supports GET and
@@ -312,8 +326,9 @@ Core fields are UUID, immutable workspace, required same-workspace consultant
 assigned_to, stable code, customer_type (`buyer`/`tenant`), status, name, mobile,
 description, is_valuable and timezone-aware created_at/updated_at. Name is required;
 unknown mobile and notes may be empty. Mobile is contact data, not a unique identity.
-Assignment does not require Range membership and remains explicit for future pass.
-No pass, Matching or Deal transitions are implemented. API access uses explicit actor scope.
+Current assignment does not require Range membership and remains explicit for pass.
+This record API adds no automatic pass, Matching or Deal transitions; Matching and
+Collaboration are separate features below. API access uses explicit actor scope.
 
 Canonical min_area/max_area (decimal square metres) and bedrooms are required;
 zero is valid and min_area must not exceed max_area. Building-age bounds remain
@@ -846,8 +861,8 @@ reference. Redemption uses the existing score-free CollaborationRequest path, re
 current ownership and deduplicates reverse/repeat requests without a fake recommendation.
 Same-owner rows have no collaboration reference. Preview scores never enter collaboration.
 
-Frontend, visit scheduling, negotiation/deals, commission,
-chat and generic push/email/SMS notification delivery remain future work.
+Frontend, visit scheduling, negotiation/deals, commission and generic push/email/SMS
+remain future work. Internal Chat is implemented separately below.
 
 ## Pass
 "Pass" is cross-consultant collaboration around a candidate file/customer match.
@@ -1046,7 +1061,7 @@ created_at_display, created_date, created_time and read_at_display using common.
 No raw canonical dates, event keys, recipient/Workspace internals or source payload appear.
 Jalali dates, Persian display names/digits and 24-hour time reuse the centralized adapter.
 
-Chat, push/email/SMS, device tokens, delivery receipts, preferences/quiet hours, broadcasts,
+External push/email/SMS, device tokens, delivery receipts, preferences/quiet hours,
 importer/crawler, voice review, Draft/Staging and Deal workflows are not implemented here.
 
 ## Internal Chat Phase 1 — private text conversations
@@ -1093,8 +1108,9 @@ body, phone or CRM data is copied. The internal link targets the authorized conv
 A repeated send POST represents a new Message; notification retry is not send deduplication.
 Chat read state and Notification read state are independent in both directions.
 
-Later phases below add realtime and image/file attachments. Not implemented: presence, typing, voice/video, reactions,
-edit/delete, forwarding, group chat, announcement channels, search, pins, mute/archive,
+Later completed phases below add realtime, image/file/voice attachments, General Group
+and announcements. Not implemented: presence, typing, video, reactions,
+edit/delete, forwarding, custom groups, search, pins, mute/archive,
 blocking, external users or push/email/SMS.
 
 ## Internal Chat Phase 2A — realtime delivery
@@ -1141,9 +1157,10 @@ REST history, reconcile by Message UUID, and order by canonical history rather t
 network arrival order. No guarantee of delivery during disconnects or process failure.
 
 Dependencies added: channels 4.3.2, channels-redis 4.3.0 and its msgpack 1.2.3 dependency;
-existing Redis/Django dependencies are unchanged. No schema migration. Typing,
-presence, receipts, voice/video, reactions, groups and announcement channels
-remain unimplemented. No frontend or additional Notification producer is introduced.
+existing Redis/Django dependencies are unchanged. Phase 2A added no schema migration,
+frontend or additional Notification producer. Voice, General Group and announcements
+are implemented in later phases below; typing, presence, receipts, video and reactions
+remain unimplemented.
 
 ### Phase 2B — WebSocket text sending
 
@@ -1199,7 +1216,7 @@ returned on storage failure. Existing after-commit fanout runs once and remains 
 
 Pillow is the only added dependency. Migration chat/0002_message_attachment preserves old
 text messages. No thumbnail/resizing pipeline, multi-attachment, OCR, antivirus, video,
-edit/delete, reactions, groups or announcement channels are implemented.
+edit/delete or reactions are implemented. General Group and announcements are implemented below.
 
 
 ### Phase 3B — private Voice Messages
@@ -1273,8 +1290,9 @@ QuerySet bypasses are privileged internal operations, not supported application 
 No dependencies were added. Phase 4A.1 below adds separate purpose-bound realtime delivery;
 private Conversation sockets remain unchanged. REST history and Notification Center remain
 available independently of realtime.
-No General Group, replies, threads, comments, reactions, media, mentions, targeting, receipts,
-pinning, scheduling, edit/delete or frontend is implemented by this phase.
+General Group is implemented separately below. Announcement replies, threads, comments,
+reactions, media, mentions, targeting, receipts, pinning, scheduling, edit/delete and
+frontend remain unimplemented.
 
 ### Phase 4A.1 — read-only announcement realtime
 
@@ -1311,9 +1329,13 @@ dependency, origin setting or private Conversation consumer changes are introduc
 
 ### Chat Team-only compatibility policy (Phase 4A.2)
 
+Current implementation only: "Team-capable" here means active manager presence,
+not workspace_mode=team or verified Range topology. Personal/Team capability migration
+will replace this heuristic later; setting workspace_mode currently changes no Chat access.
+
 Chat requires an active Workspace with at least one active Agency Manager or Range
 Manager. Without either role, every Chat surface is denied: private history, sends,
-read actions, attachments/voice, announcement history/publishing/delegation, both
+read actions, attachments/voice, announcement history/publishing/delegation, all Chat
 realtime tickets, socket connections and deliveries. Historical records and Notifications
 are retained; normal access can resume when the Workspace becomes Team-capable.
 
@@ -1331,8 +1353,8 @@ needed for current authorities. Existing delegation rows are preserved until exp
 revocation. Authority never grants access to another user's private conversation.
 `customer_type`, workspace ownership, staff and superuser flags grant no Chat authority.
 No schema, dependency, ticket/protocol or notification/read lifecycle change is introduced.
-This is Chat-only compatibility; permanent repository-wide Personal/Team design and
-General Group remain deferred.
+This is Chat-only compatibility, not the planned central Workspace Authority. General
+Group is implemented below; repository-wide capability/authority enforcement is deferred.
 
 
 ### Internal Chat Phase 4B — General Group Foundation
@@ -1357,16 +1379,18 @@ The unchanged centralized Chat policy applies before all access. All current act
 roles may read settings, and read/send when enabled, regardless of Range. Only current
 Workspace Chat Authority changes settings: Agency Managers when present, otherwise Range
 Managers. Owner/staff/superuser/customer_type confer no bypass. Authority transitions are
-immediate without changing enabled state. Team-to-Personal denies all access but retains
-state/history; Personal-to-Team restores access if still enabled. Private Chat and
+immediate without changing enabled state. Losing the final active manager denies all access but retains
+state/history; restoring a manager restores access if still enabled. These are
+compatibility-state transitions, not workspace_mode changes. Private Chat and
 Announcements remain independent and unchanged.
 
 Migration chat/0005_general_group adds only these two models, Workspace uniqueness,
 nonempty message constraint and Workspace/created_at/UUID history index. No dependency.
 No group Notifications, unread/read markers, receipts, membership rows or GET mutations.
-No realtime/tickets/Channels fanout (deferred to Phase 4B.1), media, replies, reactions,
-edit/delete, targeting, custom groups, moderation or frontend. The permanent repository-wide
-Personal/Team redesign remains deferred; no workspace_mode or organization schema changes.
+Phase 4B.1 below adds realtime/tickets/Channels fanout. Media, replies, reactions,
+edit/delete, targeting, custom groups, moderation and frontend remain unavailable.
+General Group phases changed no organization schema; B1 later added workspace_mode
+without changing this compatibility policy.
 
 
 ### Internal Chat Phase 4B.1 — General Group Realtime Delivery
@@ -1403,4 +1427,4 @@ history provide best-effort recovery. There is no replay/outbox/backfill.
 
 No Notifications, read/unread state, receipts, membership, media, settings commands, schema
 or dependency changes. Private/announcement protocols and centralized Chat authority remain
-unchanged; the broader Personal/Team redesign remains deferred.
+unchanged; mode-based capabilities and repository-wide authority enforcement remain deferred.

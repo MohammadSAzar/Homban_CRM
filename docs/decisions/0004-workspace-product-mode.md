@@ -29,6 +29,13 @@ must fail closed for unresolved modes; B1 does not wire mode into existing featu
 Existing owner privileges and Chat's temporary manager-role policy remain unchanged
 until their dedicated authority/capability phases.
 
+## Subsequent clarification — B2a / B2b
+B2a adds informational, read-only workspace_mode to GET `/api/v1/auth/me/`, sourced
+from the current Workspace as personal/team/null. It changes no authentication,
+permission or capability behavior. B2b aligns product documentation with the approved
+target while preserving the B1 decision. Central Workspace Authority, topology
+enforcement and capability migration remain deferred.
+
 ## Classification and later enforcement
 Before final non-null enforcement: inventory deployed data read-only, approve an
 explicit Workspace-to-mode mapping, handle every unresolved row, and verify all

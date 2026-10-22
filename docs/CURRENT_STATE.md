@@ -17,9 +17,25 @@ Chat, Matching, Collaboration, Daily Tasks, and other feature behavior is unchan
 The read-only inventory procedure and migration contract are in
 [ADR 0004](decisions/0004-workspace-product-mode.md).
 
-This document describes workspace-scoped authentication, organizational user management,
-location configuration, Range Management, PropertyFile and Customer APIs, and PropertyFile/Customer
-domain foundations on 2026-09-24.
+## Current checkpoint — B2a implemented; B2b documentation alignment
+GET `/api/v1/auth/me/` exposes read-only workspace_mode from the current Workspace as
+"personal", "team" or null. This is informational only; authentication, permissions,
+authority and feature availability are unchanged.
+
+Implemented: PropertyFile/Customer APIs, Matching/Profile/recommendations, Collaboration,
+Daily Tasks, Manual Tasks/Calendar, in-app Notification Center, private Chat with realtime
+and WebSocket text sending, secure image/file and Ogg/Opus voice attachments, Announcements
+with realtime, and General Group with realtime/text sending. These are backend capabilities;
+this does not claim a completed frontend or production deployment.
+
+Current authorization remains transitional: Chat uses active manager presence, not
+workspace_mode; Collaboration and cross-consultant Matching are not centrally Team-gated.
+Repository-wide Workspace Authority, canonical Team topology enforcement, central
+capabilities and final mode NOT NULL enforcement remain future work. Legacy owner
+privileges in Location/Range policies have not been removed.
+
+The sections below include historical phase verification totals and implementation detail;
+older phase exclusions do not mean later completed features are absent.
 
 ## Repository
 Root folder:
@@ -78,6 +94,10 @@ Known apps:
 - `ranges`
 - `properties`
 - `customers`
+- `matching`
+- `tasks`
+- `notifications`
+- `chat`
 
 ## Workspace
 A `Workspace` model exists.
@@ -86,7 +106,8 @@ Known concepts include:
 - UUID primary key
 - name
 - slug
-- customer type
+- customer_type (purchaser metadata)
+- workspace_mode (nullable personal/team classification)
 - active state
 - region mode
 - timestamps
@@ -224,7 +245,8 @@ SQL CHECKs protect numeric/bound/type invariants. Model and forward/reverse M2M 
 protect workspace integrity and reject new inactive Region links. Existing inactive
 links may remain. Region references and business parents are protected from deletion.
 Atomic internal services create aggregates and replace preferences. The Customer REST
-API now authorizes these operations; frontend, Matching and Deal logic remain future work.
+API now authorizes these operations; frontend and Deal logic remain future work.
+Matching is implemented below.
 PropertyFile remains unchanged by the Customer API feature.
 
 ### Canonical Customer completeness
@@ -357,7 +379,7 @@ type/status/assignee/location/area/bedrooms/sale price/source/valuable flag.
 Property policies, serializers, filters, views and transactional API services live in
 apps/properties, alongside the unchanged internal domain-creation service. Reads join
 display relations; list pages omit child collections and detail prefetches them.
-No schema changes, migrations or new dependencies are required. Matching remains future work.
+This API phase required no schema changes, migrations or dependencies. Matching is implemented below.
 
 PropertyFile API verification: 620 tests pass (533 existing plus 87 API cases),
 with 99% apps/common statement coverage. Django check passes and no migration drift
@@ -494,7 +516,8 @@ company/control-plane users are excluded, including staff/superusers without mem
 Access requests load the user and workspace together. Tokens contain identity and
 standard token metadata only; roles and workspace data are read from the database.
 The profile allowlist is id, username, first_name, last_name, phone_number, role,
-role_display (Persian), is_workspace_owner, workspace_id, and workspace_name.
+role_display (Persian), is_workspace_owner, workspace_id, workspace_name, and read-only
+workspace_mode (personal/team/null).
 
 Access lifetime is five minutes; refresh lifetime is one day, renewed on rotation.
 SimpleJWT's blacklist app rejects previously rotated refresh tokens. Its bundled
@@ -516,17 +539,17 @@ deployment is incomplete (`ALLOWED_HOSTS` is empty). HTTPS, client token storage
 login rate limiting, and signing-key operations need deployment decisions. This
 foundation uses Django's environment-backed secret as SimpleJWT's default signing key.
 
-## Not yet implemented / not confirmed as implemented
-Treat these as future work unless repository inspection proves otherwise:
-- Full permission framework
+## Not yet implemented
+- Central Workspace Authority, Team topology invariants and mode-based capability enforcement
+- Final workspace_mode NOT NULL enforcement after explicit classification
 - Recurring reminders / external calendar integration
-- Pass/collaboration workflow
 - Frontend task/calendar components
-- Chat realtime/media/groups (private text Phase 1 is implemented below)
+- Chat video, reactions, typing/presence, multi-attachment and frontend
 - External notification delivery: push/email/SMS (in-app Notification Center is implemented below)
 - Deals
-- External import workers
-- Voice/AI creation
+- Draft/Staging and imports/external import workers
+- Voice-to-CRM structured creation (separate from implemented Chat voice)
+- Map implementation
 - Customer-facing custom admin panel
 - Company control plane
 - Production deployment
@@ -641,8 +664,8 @@ are available without any customer-facing controls. See DOMAIN for worker/recove
 
 Migration matching/0003_recommendation_generation.py adds the outbox/progress table and
 the per-recommendation generation watermark. Existing formulas and Live Matching endpoints
-are unchanged. CollaborationRequest and Daily Tasks feed are separate features below; frontend, manual
-reminder/tasks and negotiation/deal workflow remain unimplemented.
+are unchanged. CollaborationRequest, Daily Tasks and ManualTask/Calendar are implemented
+as separate features below; frontend and negotiation/deal workflow remain unimplemented.
 
 Verification: 51 focused generation tests passed, including MySQL concurrent duplicate
 processing, rollback/on_commit capture, independent viewer profiles, stale-event ordering,
@@ -739,7 +762,7 @@ requires a range of at most 366 inclusive days and returns flat, paginated rows.
 
 The global product rule and future RTL/Jalali picker/JavaScript contract are documented in
 PRODUCT/DOMAIN. No frontend or JavaScript dependency is added. Recurrence, external calendars,
-notification delivery, visit scheduling and negotiation/deal workflows remain future work.
+scheduled reminder delivery, visit scheduling and negotiation/deal workflows remain future work.
 
 Verification: all 130 new focused tests passed. The single full regression/coverage run
 passed 1,340 tests with 99% overall coverage. The Jalali adapter, ManualTask model/services
@@ -763,7 +786,7 @@ API list/detail/read/unread/read-all/unread-count are personal for all active cu
 with strict inputs, newest-first 50-row pagination, bounded queries and centralized Jalali
 output. Source details/contacts/scores/profiles never enter notification summaries or API.
 
-Chat, push/email/SMS, device tokens, preferences, broadcasts, importer/crawler, voice review,
+External push/email/SMS, device tokens, preferences, importer/crawler, voice review,
 Draft/Staging, frontend and Deal workflow remain outside this feature. Apply the new schema
 migration before running the updated web/worker code; no historical notification backfill.
 
@@ -788,8 +811,9 @@ append-only. Lists/history paginate at 50; joined identities and correlated unre
 subqueries keep list query counts constant. Common Jalali formatting supplies all timestamps.
 Text-message creation atomically publishes a generic deduplicated recipient notification;
 no message body is copied and Notification read state remains independent.
-Later Chat phases below add realtime and image/file attachments. Presence, typing, voice/video,
-reactions, edit/delete, groups/channels, search, mute/archive and frontend remain unimplemented.
+Later completed phases below add realtime, attachments/voice, announcements and General
+Group. Presence, typing, video, reactions, edit/delete, search, mute/archive and frontend
+remain unimplemented.
 
 Verification: 43 focused Chat tests and 70 unchanged Notification tests passed together.
 Chat and Notification production modules have 100% statement coverage. The single full
@@ -814,8 +838,8 @@ successful. Delivery is best effort; reconnect recovery uses REST history, not a
 Read markers and Notification lifecycle remain independent. See DOMAIN for deployment,
 origin/ticket handling and CHAT_REDIS_URL settings. Test channel layers are in-memory only.
 Only channels/channels-redis/msgpack dependencies were added; existing versions unchanged.
-No typing, presence, receipts, voice/video, reactions, groups,
-announcement channels, frontend or push delivery is implemented.
+Phase 2A did not add typing, presence, receipts or frontend. Later completed phases
+below add voice, announcements and General Group; video and external push remain future.
 
 ### Phase 2B — WebSocket send path
 
@@ -841,8 +865,8 @@ or bytes. Notification, read state and centralized Jalali behavior remain unchan
 Send failures attempt file cleanup; outer-transaction/process/storage failure limitations
 are documented in DOMAIN. Migration chat/0002_message_attachment adds only attachment fields
 and content/metadata constraints. Pillow is the only added dependency.
-No video, multiple attachments, thumbnails, OCR/AV service, edit/delete, reactions,
-groups, announcement channels or frontend are implemented.
+No video, multiple attachments, thumbnails, OCR/AV service, edit/delete, reactions
+or frontend is implemented. Later phases below add announcements and General Group.
 
 
 ## Internal Chat Phase 3B — Voice Messages
@@ -880,7 +904,7 @@ back the entire publish. No announcement body/contact data enters Notification s
 
 Migrations: chat/0004_announcements and notifications/0002_announcements. No new dependency.
 Announcement realtime is added separately in Phase 4A.1 below.
-No General Group, replies/discussion, threads, reactions, media,
+General Group is implemented separately below. No announcement replies/discussion, threads, reactions, media,
 targeting, receipts, edit/delete, pinning, scheduling or frontend is added.
 
 ## Internal Chat Phase 4A.1 — Announcement Realtime Delivery
@@ -897,15 +921,19 @@ successful atomic Notifications. Rollback emits nothing. Publisher sockets also 
 The event reuses announcement_data with Jalali time and safe professional identity. Redis or
 callback failure is logged without invalidating durable publication. REST history/Notification
 Center remain recovery sources. Text commands are rejected safely; binary input closes.
-No socket writes, read-state mutation, replay/outbox/backfill, receipts, General Group, media
+No announcement socket writes, read-state mutation, replay/outbox/backfill, receipts or media
 or frontend. No migrations/dependencies or private Conversation consumer changes.
 
 
 ### Chat Team-only compatibility policy (Phase 4A.2)
 
+Current implementation only: "Team-capable" here means active manager presence,
+not workspace_mode=team or verified Range topology. Personal/Team capability migration
+will replace this heuristic later; setting workspace_mode currently changes no Chat access.
+
 Chat requires an active Workspace with at least one active Agency Manager or Range
 Manager. Without either role, every Chat surface is denied: private history, sends,
-read actions, attachments/voice, announcement history/publishing/delegation, both
+read actions, attachments/voice, announcement history/publishing/delegation, all Chat
 realtime tickets, socket connections and deliveries. Historical records and Notifications
 are retained; normal access can resume when the Workspace becomes Team-capable.
 
@@ -923,8 +951,8 @@ needed for current authorities. Existing delegation rows are preserved until exp
 revocation. Authority never grants access to another user's private conversation.
 `customer_type`, workspace ownership, staff and superuser flags grant no Chat authority.
 No schema, dependency, ticket/protocol or notification/read lifecycle change is introduced.
-This is Chat-only compatibility; permanent repository-wide Personal/Team design and
-General Group remain deferred.
+This is Chat-only compatibility, not the planned central Workspace Authority. General
+Group is implemented below; repository-wide capability/authority enforcement is deferred.
 
 
 ### Internal Chat Phase 4B — General Group Foundation
@@ -949,16 +977,18 @@ The unchanged centralized Chat policy applies before all access. All current act
 roles may read settings, and read/send when enabled, regardless of Range. Only current
 Workspace Chat Authority changes settings: Agency Managers when present, otherwise Range
 Managers. Owner/staff/superuser/customer_type confer no bypass. Authority transitions are
-immediate without changing enabled state. Team-to-Personal denies all access but retains
-state/history; Personal-to-Team restores access if still enabled. Private Chat and
+immediate without changing enabled state. Losing the final active manager denies all access but retains
+state/history; restoring a manager restores access if still enabled. These are
+compatibility-state transitions, not workspace_mode changes. Private Chat and
 Announcements remain independent and unchanged.
 
 Migration chat/0005_general_group adds only these two models, Workspace uniqueness,
 nonempty message constraint and Workspace/created_at/UUID history index. No dependency.
 No group Notifications, unread/read markers, receipts, membership rows or GET mutations.
-No realtime/tickets/Channels fanout (deferred to Phase 4B.1), media, replies, reactions,
-edit/delete, targeting, custom groups, moderation or frontend. The permanent repository-wide
-Personal/Team redesign remains deferred; no workspace_mode or organization schema changes.
+Phase 4B.1 below adds realtime/tickets/Channels fanout. Media, replies, reactions,
+edit/delete, targeting, custom groups, moderation and frontend remain unavailable.
+General Group phases changed no organization schema; B1 later added workspace_mode
+without changing this compatibility policy.
 
 
 ### Internal Chat Phase 4B.1 — General Group Realtime Delivery
@@ -995,4 +1025,4 @@ history provide best-effort recovery. There is no replay/outbox/backfill.
 
 No Notifications, read/unread state, receipts, membership, media, settings commands, schema
 or dependency changes. Private/announcement protocols and centralized Chat authority remain
-unchanged; the broader Personal/Team redesign remains deferred.
+unchanged; mode-based capabilities and repository-wide authority enforcement remain deferred.

@@ -3,42 +3,72 @@
 ## Overview
 Homban is a commercial web-based CRM for real-estate businesses in Iran.
 
-The product is designed to be sold to one of three buyer types:
-1. Agency manager
-2. Range manager
-3. Individual consultant
+The canonical product modes are **Personal** and **Team**. Agencies, Range Managers
+and individual consultants may be commercial purchasers, not three runtime variants.
+Keep four concepts separate:
 
-The same core product must support all three cases.
+- Workspace: tenant/isolation boundary.
+- Purchaser identity: `Workspace.customer_type`, historical/commercial/provisioning metadata.
+- Product mode: `Workspace.workspace_mode`, personal or team.
+- Operational authority/topology: roles, Ranges and planned central Workspace Authority.
 
-Purchaser identity is separate from product classification: the canonical modes
-are Personal and Team. Phase B1 stores this explicitly without inferring it from
-buyer type or changing existing feature permissions. Full product/permission
-documentation alignment follows in later phases; see
-[ADR 0004](decisions/0004-workspace-product-mode.md).
+### Personal — target architecture
+
+One consultant operating alone, with own files, customers, matching, MatchingProfile,
+Manual Tasks, Calendar and applicable Notification Center behavior. Personal has no
+Internal Chat, General Group, Announcements, Collaboration, cross-consultant pass or
+organizational team management. Future imports, Voice-to-CRM, Deal, personal-capable
+Map and reporting are planned; defining the mode does not implement them.
+
+### Team — target architecture
+
+Team contains one or more real operational Ranges; each Range is a team. With exactly
+one Range, its Range Manager is top Workspace operational authority; no Agency Manager
+is required. With multiple Ranges, each has a Range Manager and one Workspace-level
+Agency Manager sits above the teams. Growth from one to multiple teams stays within
+Team mode. These topology/authority invariants are not yet enforced.
+
+### Current transition
+
+B1 stores personal/team with no default. NULL is temporary unresolved classification,
+not a third mode. Existing rows were not auto-classified. New application provisioning
+uses `organizations.services.create_workspace` with explicit mode, independent of
+purchaser, owner, roles and Range counts. B2a GET `/api/v1/auth/me/` exposes read-only
+`workspace_mode` as `"personal"`, `"team"` or `null`. This is informational: authentication,
+permissions, authority and capabilities are unchanged. Final NOT NULL enforcement is
+deferred. See [ADR 0004](decisions/0004-workspace-product-mode.md).
+
+### Approved feature classification
+
+| Classification | Features |
+| --- | --- |
+| Core — Personal + Team | PropertyFile, Customer, own Matching, MatchingProfile, ManualTask, Calendar, Notification Center, geography; future imports/staging, Voice-to-CRM, Deal, personal-capable Map/reporting |
+| Team-only | Internal Chat, General Group, Announcements, Collaboration, cross-consultant matching/pass and cross-consultant workflows |
+| Topology-dependent Team | User/Range management, Workspace administration, global announcement administration, reporting scopes, map territory assignment, future Custom Admin permissions and Workspace Authority actions |
+
+This is the approved direction, not completed capability enforcement. Current policies
+remain domain/role-based; Collaboration and cross-consultant Matching are not centrally
+Team-gated. Chat uses the temporary manager-presence rule below. Purchaser/owner identity
+must not grant target operational authority; legacy owner privileges remain in some domains.
 
 ## Workspace model
-Each purchase creates an isolated Homban workspace with:
+Intended Workspace provisioning provides the following; the full production provisioning
+control plane remains future work:
 - A dedicated address/subdomain or equivalent route
 - An initial admin/primary-user credential
-- Unlimited internal users, subject to product/business policy
+- One consultant in Personal; Team users subject to product/business policy
 - Independent data and organizational structure
 
 Homban is not currently a central multi-agency CRM from the customer's perspective.
 
 A future company-level control plane may manage provisioning, billing, support, operational status, and lawful/privacy-aware cross-customer analytics. This must remain separate from ordinary customer data access.
 
-## Core organizational structure
-A full agency may contain:
-- Agency manager
-- Optional ranges/teams
-- One range manager per range
-- Multiple consultants per range
-- Optional secretary
-- Optional delegated admin users
+## Organizational implementation boundary
 
-A range is a working team. All ranges perform similar real-estate work.
-
-Range structure is optional. An agency may directly manage consultants without ranges.
+The target topology above supersedes the old optional-Range agency design. Current
+models still permit zero Ranges, nullable managers and unassigned consultants. Later
+topology enforcement must address legacy data explicitly. Secretary and future delegated
+Admin behavior must not imply universal Workspace authority.
 
 ## File and customer definitions
 Files:
@@ -52,7 +82,8 @@ Customers:
 A file/customer is assigned to a consultant, who is responsible for it.
 
 ## Pass/collaboration concept
-Consultants may collaborate across their own assigned records.
+In the Team target, consultants may collaborate across assigned records. The existing
+Collaboration implementation is not yet workspace_mode-gated.
 
 Example:
 - Consultant A owns a file
@@ -67,9 +98,12 @@ Commission formulas are not yet finalized.
 A workspace can operate in any city, though initial focus is Tehran.
 
 Location configuration modes:
-1. No region breakdown
-2. Custom regions defined by the primary user
-3. Divar-compatible city/region structure
+1. Custom Workspace-wide regions
+2. Divar-compatible Workspace-wide city/region structure
+
+region_mode=NULL means incomplete setup, not a no-region operating mode. Current
+configuration permits Agency Managers and owners; target authority is a later refactor.
+Product mode does not redesign the canonical geography model.
 
 City exists conceptually before region.
 
@@ -103,8 +137,8 @@ Matching is a central product feature and an advanced version of the earlier Goo
 
 Requirements:
 - Search file/customer compatibility automatically
-- Match across consultants within the workspace
-- Support pass/collaboration logic
+- Own File-to-Customer matching in both modes
+- Cross-consultant matching/pass in Team only as the target capability
 - Produce explainable score
 - Show recommendations in:
   - Task/recommendation page
@@ -128,40 +162,42 @@ Internal workspace chat:
 - Official announcement channel
 - Optional general group
 
-Announcement posting:
-- Agency manager by default
-- Agency manager may delegate to range managers and/or secretary
+Chat is Team-only in the target. Current availability is a compatibility heuristic,
+not workspace_mode enforcement: an active Agency Manager or Range Manager must exist.
+Announcement publishing/delegation administration uses current Workspace Chat Authority:
+Agency Managers take precedence; otherwise Range Managers inherit it. Explicit delegation
+may allow eligible Range Managers/Secretaries to publish. This is not the planned
+repository-wide topology-based Workspace Authority resolver.
 
 General group:
 - One optional Workspace-wide group, Team-only; all active customer roles participate
   automatically when enabled. No manual membership or custom groups.
 - Current Workspace Chat Authority enables/disables it: active Agency Managers take
   precedence; active Range Managers inherit authority only when none exist.
-- Without either active manager role, Personal/consultant-only Workspaces have no Chat.
+- Without either active manager role, Chat is unavailable; this does not classify workspace_mode.
   Customer type and workspace ownership do not grant Chat authority.
 - The Phase 4B foundation is text-only REST history/sending, disabled by default;
   disabling retains history. Phase 4B.1 adds realtime delivery and WebSocket text sending
   through the same service; REST history remains recovery. No group Notifications/read state.
 
-Content:
-- Text
-- Voice
-- Image
-- Video
-- Emoji
+Implemented content: private text plus one secure image/file or Ogg/Opus voice attachment;
+Announcements and General Group are text-only. Private and General Group sockets send
+text; attachment uploads use REST. Normal Unicode emoji is text. Video, multi-attachment,
+reactions and recording frontend remain unimplemented.
 
 No cross-workspace chat.
 
 ## Notifications
-At least three distinguishable notification categories:
+The in-app Notification Center supports matching, collaboration, private Chat and
+announcements. Future external/import delivery is separate. Product direction includes:
 1. Matching / suggested-program updates
 2. Private chat message received
 3. Auto-import discovery completed and records await review
 
 Notifications should deep-link to the relevant destination/action.
 
-## Deal registration
-Completed real-estate deals must be recorded.
+## Deal registration — future
+The planned Deal workflow will record completed real-estate deals.
 
 Deal data includes:
 - File
@@ -171,7 +207,8 @@ Deal data includes:
 - Tracking code where applicable
 - Other required transaction fields
 
-After deal registration, related file/customer statuses are updated automatically.
+The future workflow is intended to update related statuses after registration;
+this automation is not implemented.
 
 Examples:
 - Sale file -> sold
@@ -179,11 +216,13 @@ Examples:
 - Rent file -> rented
 - Tenant customer -> rental completed
 
-## Admin panel
-Homban requires a custom product admin panel.
+## Admin panel — future
+Homban requires a custom product admin panel; it is not implemented.
 Django's default admin is not the customer-facing admin experience.
 
-Agency manager has primary access and may delegate access to secretary/admin or other approved users.
+Target topology-dependent administration uses future central Workspace Authority with
+explicit delegation. Purchaser/owner identity is not an operational bypass. No configurable
+Admin permission bundle is implemented yet.
 
 The panel should manage product processes subject to permissions.
 

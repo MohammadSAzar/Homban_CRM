@@ -1,9 +1,40 @@
 # Homban Permissions
 
-## Principles
-Permissions are one of the most critical parts of Homban.
+## TARGET Personal/Team authorization model — not yet centrally implemented
+Workspace is the tenant boundary; customer_type is purchaser metadata, not entitlement.
+workspace_mode is personal/team; NULL is unresolved transition state, not a third mode.
+GET `/api/v1/auth/me/` exposes it read-only without changing authentication or access.
 
-Authorization is evaluated in this order:
+Target permission evaluation:
+authentication → Workspace isolation → product capability → Workspace Authority / role
+→ organizational scope → ownership → action → sensitive-field visibility.
+
+Personal is one consultant using Core features, with no organizational management, Chat,
+Announcements, General Group, Collaboration or cross-consultant matching/pass. Team has
+at least one Range: single-team Workspace authority is its Range Manager; multi-team
+authority is an Agency Manager above managed Ranges. Central authority, capability and
+topology enforcement remain planned. Storing mode does not implement these policies.
+
+Workspace Authority will not bypass these privacy boundaries:
+
+- Private Chat: current participants only.
+- ManualTask/Calendar: owner only.
+- Notification Center: recipient only.
+- MatchingProfile: owner only.
+- Saved recommendations: current viewer ownership.
+- Collaboration: current participants only.
+- Restricted contacts and sibling scoring: existing visibility restrictions still apply.
+
+is_workspace_owner is purchaser/primary identity, not target operational authorization.
+Current owner-based Location administration and broader Range reads remain legacy
+exceptions until focused refactors. Staff/superuser status is not customer authority.
+
+## CURRENT IMPLEMENTED PERMISSIONS
+Domain sections below describe current behavior unless explicitly marked future. Chat
+has its manager-presence compatibility gate; Collaboration and cross-consultant Matching
+do not yet use a central Team capability. NULL mode does not deny authentication.
+
+Current general authorization layers (domain-specific policies apply):
 1. Authentication
 2. Workspace isolation
 3. Role
@@ -22,19 +53,19 @@ users are rejected. Staff/superuser flags do not bypass customer membership chec
 JWT and `/me/` use UUID identity and current database membership; roles are not
 trusted from claims. See [ADR 0003](decisions/0003-workspace-scoped-username.md).
 
-## Agency manager
+## Current Agency Manager role and legacy broad expectations
 Scope:
 - Entire workspace
 
-Expected broad capabilities:
+Legacy broad expectations (implemented only where domain policy below says so):
 - Manage organizational structure
 - Create/manage range managers
 - Create/manage consultants
 - Manage ranges
 - Manage workspace regions/configuration
 - View/manage files and customers across workspace
-- Manage deals
-- Delegate admin access
+- Future Deal administration
+- Future Custom Admin delegation
 - Manage general-group availability
 - Manage announcement posting permissions
 
@@ -71,21 +102,25 @@ Cannot:
 ## Secretary
 Not fully specified yet.
 
-May receive delegated capabilities from agency manager.
+Current explicit announcement delegation is supported. Future wider delegation must use
+the central Workspace Authority policy, not purchaser identity.
 
 Do not assume secretary has broad data access until specified.
 
 ## Admin
 Product-level delegated workspace admin role.
 
-Exact permission bundle should be configurable/delegated by agency manager rather than treated as unrestricted superuser.
+A future configurable bundle must be explicitly delegated under Workspace Authority.
+It is not implemented; customer Admin is not an unrestricted superuser.
 
 ## Workspace owner
 `is_workspace_owner` identifies the purchaser/primary user.
 
 It is not itself a job role.
 
-Ownership may affect workspace-level settings and account administration but should not replace role/scope permissions.
+Target ownership grants no operational authority. Current legacy exceptions in Location
+and Range APIs below remain implemented until later authority refactors; documenting
+them is not approval to extend owner privileges.
 
 ## Organizational user API policy
 This feature's explicit policy takes precedence over broad future capabilities:
@@ -513,9 +548,13 @@ REST history and Notification Center remain independent recovery sources. No rep
 
 ### Chat Team-only compatibility policy (Phase 4A.2)
 
+Current implementation only: "Team-capable" here means active manager presence,
+not workspace_mode=team or verified Range topology. Personal/Team capability migration
+will replace this heuristic later; setting workspace_mode currently changes no Chat access.
+
 Chat requires an active Workspace with at least one active Agency Manager or Range
 Manager. Without either role, every Chat surface is denied: private history, sends,
-read actions, attachments/voice, announcement history/publishing/delegation, both
+read actions, attachments/voice, announcement history/publishing/delegation, all Chat
 realtime tickets, socket connections and deliveries. Historical records and Notifications
 are retained; normal access can resume when the Workspace becomes Team-capable.
 
@@ -533,8 +572,8 @@ needed for current authorities. Existing delegation rows are preserved until exp
 revocation. Authority never grants access to another user's private conversation.
 `customer_type`, workspace ownership, staff and superuser flags grant no Chat authority.
 No schema, dependency, ticket/protocol or notification/read lifecycle change is introduced.
-This is Chat-only compatibility; permanent repository-wide Personal/Team design and
-General Group remain deferred.
+This is Chat-only compatibility, not the planned central Workspace Authority. General
+Group is implemented below; repository-wide capability/authority enforcement is deferred.
 
 
 ### Internal Chat Phase 4B — General Group Foundation
@@ -559,16 +598,18 @@ The unchanged centralized Chat policy applies before all access. All current act
 roles may read settings, and read/send when enabled, regardless of Range. Only current
 Workspace Chat Authority changes settings: Agency Managers when present, otherwise Range
 Managers. Owner/staff/superuser/customer_type confer no bypass. Authority transitions are
-immediate without changing enabled state. Team-to-Personal denies all access but retains
-state/history; Personal-to-Team restores access if still enabled. Private Chat and
+immediate without changing enabled state. Losing the final active manager denies all access but retains
+state/history; restoring a manager restores access if still enabled. These are
+compatibility-state transitions, not workspace_mode changes. Private Chat and
 Announcements remain independent and unchanged.
 
 Migration chat/0005_general_group adds only these two models, Workspace uniqueness,
 nonempty message constraint and Workspace/created_at/UUID history index. No dependency.
 No group Notifications, unread/read markers, receipts, membership rows or GET mutations.
-No realtime/tickets/Channels fanout (deferred to Phase 4B.1), media, replies, reactions,
-edit/delete, targeting, custom groups, moderation or frontend. The permanent repository-wide
-Personal/Team redesign remains deferred; no workspace_mode or organization schema changes.
+Phase 4B.1 below adds realtime/tickets/Channels fanout. Media, replies, reactions,
+edit/delete, targeting, custom groups, moderation and frontend remain unavailable.
+General Group phases changed no organization schema; B1 later added workspace_mode
+without changing this compatibility policy.
 
 
 ### Internal Chat Phase 4B.1 — General Group Realtime Delivery
@@ -605,4 +646,4 @@ history provide best-effort recovery. There is no replay/outbox/backfill.
 
 No Notifications, read/unread state, receipts, membership, media, settings commands, schema
 or dependency changes. Private/announcement protocols and centralized Chat authority remain
-unchanged; the broader Personal/Team redesign remains deferred.
+unchanged; mode-based capabilities and repository-wide authority enforcement remain deferred.
