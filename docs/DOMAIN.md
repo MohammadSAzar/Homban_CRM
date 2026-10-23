@@ -31,8 +31,7 @@ Current roles:
 
 The workspace purchaser/primary user is not a role.
 The existing `is_workspace_owner` identifies that primary account only in the target.
-Some current APIs retain legacy owner privileges (notably Location configuration and
-Range reads); their removal is deferred, not completed by product-mode exposure.
+Some current APIs retain legacy owner privileges (notably Range reads); their removal is deferred, not completed by product-mode exposure.
 
 ## Organization — target and current schema
 Target Personal is one consultant with no operational Range/team semantics. Target Team
@@ -147,8 +146,8 @@ constraints and the Range.regions M2M workspace guard remain unchanged.
 
 ## Location
 Geography remains Workspace-wide and Core-capable in both modes. Range.regions constrains
-a team; it is not a future consultant territory/work-area identity. Location authority is
-a later permission refactor, not a geography redesign.
+a team; it is not a future consultant territory/work-area identity. C3 Location administration uses
+central Workspace Authority without redesigning geography.
 
 Conceptual hierarchy:
 - City
@@ -169,9 +168,9 @@ Do not assume external region labels exactly match internal Homban regions.
 
 ### Location configuration API
 All active customer members may read their workspace's location configuration.
-Agency managers and workspace owners (regardless of operational role) may manage
-it. Ownership grants location configuration access only; it does not expand the
-organizational user-management policy.
+C3 management requires resolved Workspace Authority: the single-team Range Manager
+or valid multi-team Agency Manager. Personal/NULL/invalid topology has no authority;
+Personal setup remains a later decision. Owner identity grants no Location bypass.
 
 City names are unique per workspace; Region names are unique per workspace/city.
 The API derives workspace from authentication and validates Region.city against

@@ -3,14 +3,17 @@ from rest_framework.exceptions import PermissionDenied
 from rest_framework.permissions import BasePermission, SAFE_METHODS
 
 from apps.accounts.authentication import customer_can_authenticate
-from apps.accounts.models import User
+from apps.organizations.authority import resolve_workspace_authority
 from .models import City, Region
 
 
 def can_manage_location(actor):
-    return bool(
-        actor.is_authenticated and customer_can_authenticate(actor)
-        and (actor.role == User.Role.AGENCY_MANAGER or actor.is_workspace_owner)
+    if not actor.is_authenticated or not customer_can_authenticate(actor):
+        return False
+    resolution = resolve_workspace_authority(actor.workspace)
+    return (
+        resolution.status == "resolved"
+        and resolution.authority_user.pk == actor.pk
     )
 
 

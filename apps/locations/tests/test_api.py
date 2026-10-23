@@ -12,6 +12,7 @@ from apps.accounts.models import User
 from apps.locations.models import City, Region
 from apps.locations.services import save_city, save_region, set_region_mode
 from apps.organizations.models import Workspace
+from apps.ranges.models import Range
 
 pytestmark = pytest.mark.django_db
 BASE = "/api/v1/"
@@ -31,9 +32,10 @@ def endpoint(kind, obj=None):
 
 @pytest.fixture
 def world():
-    workspace = Workspace.objects.create(name="اول", slug="first", customer_type="consultant")
+    workspace = Workspace.objects.create(name="اول", slug="first", customer_type="consultant", workspace_mode="team")
     foreign_workspace = Workspace.objects.create(name="دوم", slug="second", customer_type="agency_manager")
-    actor = User.objects.create_user(username="manager", workspace=workspace, role="agency_manager")
+    actor = User.objects.create_user(username="manager", workspace=workspace, role="range_manager")
+    Range.objects.create(workspace=workspace, name="team", manager=actor)
     city = City.objects.create(workspace=workspace, name="تهران")
     other_city = City.objects.create(workspace=workspace, name="شیراز")
     foreign_city = City.objects.create(workspace=foreign_workspace, name="تهران")
@@ -54,7 +56,7 @@ def body(world, kind, **overrides):
 def test_location_management_role_and_owner_matrix(world, role, owner):
     User.objects.filter(pk=world.actor.pk).update(role=role, is_workspace_owner=owner)
     client = client_for(world.actor)
-    allowed = role == "agency_manager" or owner
+    allowed = role == "range_manager"
     for kind, obj in [("cities", world.city), ("regions", world.region)]:
         assert client.get(endpoint(kind)).status_code == 200
         assert str(obj.pk) in {row["id"] for row in client.get(endpoint(kind)).data["results"]}
@@ -258,7 +260,7 @@ def test_list_query_count_is_constant(world, kind):
         Region.objects.create(workspace=world.workspace, city=city, name=f"منطقه {i}")
     with CaptureQueriesContext(connection) as expanded:
         assert client.get(endpoint(kind)).status_code == 200
-    assert len(initial) == len(expanded) == 3
+    assert len(initial) == len(expanded) == 7
 
 
 def test_region_city_filter_is_scoped(world):

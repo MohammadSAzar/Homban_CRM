@@ -128,12 +128,12 @@ never grants operational authority; future authority cannot override private obj
 boundaries documented in PERMISSIONS.
 
 Migration remains incremental: B1 mode foundation and B2a read-only context are complete;
-B2b aligns documentation. C1 adds the resolver; C2 migrates only Chat authority consumers.
+B2b aligns documentation. C1 adds the resolver; C2 migrates Chat and C3 Location authority consumers.
 Next come remaining authority consumer migration,
 topology invariants
 (D), and capabilities (E), followed by focused feature refactors (F): Chat, Collaboration,
 Matching scopes, Daily Tasks projection, User/Range management, Notification producers,
-File/Customer scopes, Location taxonomy authority, then remaining admin-facing permissions.
+File/Customer scopes, then remaining admin-facing permissions.
 Review data/backward compatibility before final architecture verification. Explicit legacy
 classification and verified provisioning must precede final NOT NULL enforcement.
 No big-bang permission rewrite or heuristic mode inference is part of this plan.
@@ -216,3 +216,15 @@ Mandatory frontend properties:
 - Minimal typing
 
 Backend APIs must remain frontend-agnostic.
+
+### Phase C3 — Location Workspace Authority
+Workspace-wide City/Region create, update and activation changes, and region_mode
+configuration now use the C1 resolver. A valid single active Range's manager is
+authority; valid multi-team topology requires exactly one active Agency Manager.
+Personal, NULL and invalid Team topology have no Location administration authority.
+Owner/customer_type/staff/superuser flags grant none. Existing authentication,
+Workspace isolation and Workspace-first write locking remain required.
+Ordinary active geography reads remain available to customer members; only resolved
+authority can inspect inactive taxonomy. Personal setup/admin UX remains an explicit
+later product decision. Geography semantics, Range.regions, capability gating and
+structural topology enforcement are unchanged; no schema migration is added.

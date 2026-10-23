@@ -101,8 +101,8 @@ Location configuration modes:
 1. Custom Workspace-wide regions
 2. Divar-compatible Workspace-wide city/region structure
 
-region_mode=NULL means incomplete setup, not a no-region operating mode. Current
-configuration permits Agency Managers and owners; target authority is a later refactor.
+region_mode=NULL means incomplete setup, not a no-region operating mode. C3
+configuration uses central Workspace Authority; Personal setup remains a later decision.
 Product mode does not redesign the canonical geography model.
 
 City exists conceptually before region.

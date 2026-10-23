@@ -26,7 +26,7 @@ Workspace Authority will not bypass these privacy boundaries:
 - Restricted contacts and sibling scoring: existing visibility restrictions still apply.
 
 is_workspace_owner is purchaser/primary identity, not target operational authorization.
-Current owner-based Location administration and broader Range reads remain legacy
+Broader owner-based Range reads remain legacy
 exceptions until focused refactors. Staff/superuser status is not customer authority.
 
 ## CURRENT IMPLEMENTED PERMISSIONS
@@ -118,8 +118,8 @@ It is not implemented; customer Admin is not an unrestricted superuser.
 
 It is not itself a job role.
 
-Target ownership grants no operational authority. Current legacy exceptions in Location
-and Range APIs below remain implemented until later authority refactors; documenting
+Target ownership grants no operational authority. Current legacy exceptions in
+Range APIs below remain implemented until later authority refactors; documenting
 them is not approval to extend owner privileges.
 
 ## Organizational user API policy
@@ -208,10 +208,9 @@ remain unsupported; no new database constraints or signals are introduced.
 
 All authenticated active customer users with an active workspace may read location
 settings and available cities/regions in their workspace. Management requires
-`role == agency_manager OR is_workspace_owner`. The owner exception applies to all
-operational roles, including consultant/range manager/secretary/admin. Non-owner
-range managers, consultants, secretaries, and admins have read access only.
-Django staff/superuser flags do not grant location management capabilities.
+the current resolved Workspace Authority, independently of purchaser/owner/staff flags.
+Single-team resolves its Range manager; multi-team resolves its unique Agency Manager.
+Personal, NULL and invalid topology confer no administration authority.
 
 Location managers may read inactive records. Read-only users see active cities and
 active regions with active cities only, including on detail endpoints. Filters can
@@ -230,8 +229,7 @@ write pattern; arbitrary ORM writes outside these services are not covered by it
 Mode changes are non-destructive and never invoke external synchronization.
 Region configuration is one Workspace-wide custom OR divar taxonomy, never per Range
 or consultant. NULL denotes incomplete setup only; operational configuration rejects
-none and NULL. Agency managers and workspace-owner purchasers (including range managers
-and individual consultants) configure their own Workspace using the existing authority.
+none and NULL. Only resolved Workspace Authority configures the Workspace.
 No unrelated operational permissions are broadened; all Regions remain Workspace-owned.
 
 ## Sensitive fields
@@ -654,3 +652,15 @@ history provide best-effort recovery. There is no replay/outbox/backfill.
 No Notifications, read/unread state, receipts, membership, media, settings commands, schema
 or dependency changes. Private/announcement protocols and centralized Chat authority remain
 unchanged; mode-based capabilities and repository-wide authority enforcement remain deferred.
+
+### Phase C3 — Location Workspace Authority
+Workspace-wide City/Region create, update and activation changes, and region_mode
+configuration now use the C1 resolver. A valid single active Range's manager is
+authority; valid multi-team topology requires exactly one active Agency Manager.
+Personal, NULL and invalid Team topology have no Location administration authority.
+Owner/customer_type/staff/superuser flags grant none. Existing authentication,
+Workspace isolation and Workspace-first write locking remain required.
+Ordinary active geography reads remain available to customer members; only resolved
+authority can inspect inactive taxonomy. Personal setup/admin UX remains an explicit
+later product decision. Geography semantics, Range.regions, capability gating and
+structural topology enforcement are unchanged; no schema migration is added.

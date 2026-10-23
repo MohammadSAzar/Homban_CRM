@@ -32,7 +32,7 @@ Current authorization remains transitional: Chat uses active manager presence, n
 workspace_mode; Collaboration and cross-consultant Matching are not centrally Team-gated.
 Workspace Authority consumer migration, canonical Team topology enforcement, central
 capabilities and final mode NOT NULL enforcement remain future work. Legacy owner
-privileges in Location/Range policies have not been removed.
+privileges remain in Range policies; C3 removes Location owner administration.
 
 ### Phase C1 — Workspace Authority resolver foundation
 `apps.organizations.authority.resolve_workspace_authority` now provides an immutable
@@ -42,7 +42,7 @@ fail closed. Only active Ranges count: one valid Range resolves its current acti
 same-Workspace Range Manager; multiple valid Ranges require exactly one active local
 Agency Manager. Invalid/missing managers or zero active Ranges return invalid. Current
 DB state is reloaded; purchaser/owner/staff flags never select authority. C1 introduced no writes,
-topology repairs or schema changes. C2 now integrates Chat authority consumers only.
+topology repairs or schema changes. C2 integrates Chat authority and C3 integrates Location administration.
 Other domain permissions remain unchanged; Chat ordinary availability still uses its compatibility policy.
 
 The sections below include historical phase verification totals and implementation detail;
@@ -449,13 +449,13 @@ partial; PUT and DELETE are unavailable. Workspace, source, external ID/slug, an
 unknown write fields are rejected. External identifiers are omitted from output.
 Creation always uses manual source; external-source records are read-only.
 
-All active customer members can read. Agency managers OR workspace owners can
-manage, regardless of owner operational role. Managers see active/inactive records;
+All active customer members can read. C3 central Workspace Authority alone can
+manage. Resolved authorities see active/inactive records;
 other users see active cities and active regions under active cities. Lists accept
 `is_active=true/false`; regions also accept `city=<uuid>`. Filters never broaden the
 actor's scope. Managers can configure inactive cities/regions for later activation.
 Pagination uses 50 records with stable name/UUID ordering. Region queries join city
-with select_related; query regression tests enforce 3 queries per nonempty list,
+with select_related; query regression tests enforce bounded queries per nonempty list,
 including JWT authentication and pagination count, independent of result size.
 
 Location policies, read/write/filter serializers, and transactional mutation services
@@ -466,8 +466,7 @@ validation are retained. The Region policy migration is described below; no depe
 Workspace Region policy now permits custom/divar as the only operational values;
 NULL is the default incomplete-setup state. One taxonomy/collection belongs to the
 Workspace, shared by every Range/user, with no cross-workspace Region sharing.
-The settings API reads NULL and only accepts custom/divar writes. Existing agency
-manager OR workspace-owner configuration authority is unchanged.
+The settings API reads NULL and only accepts custom/divar writes. C3 configuration authority uses the central resolver.
 Migration organizations/0003_workspace_region_policy makes the field nullable,
 converts legacy none to NULL, preserves custom/divar and adds a database CHECK.
 Unknown stored values stop migration for review; no business mode is invented.
@@ -1044,3 +1043,15 @@ history provide best-effort recovery. There is no replay/outbox/backfill.
 No Notifications, read/unread state, receipts, membership, media, settings commands, schema
 or dependency changes. Private/announcement protocols and centralized Chat authority remain
 unchanged; mode-based capabilities and repository-wide authority enforcement remain deferred.
+
+### Phase C3 — Location Workspace Authority
+Workspace-wide City/Region create, update and activation changes, and region_mode
+configuration now use the C1 resolver. A valid single active Range's manager is
+authority; valid multi-team topology requires exactly one active Agency Manager.
+Personal, NULL and invalid Team topology have no Location administration authority.
+Owner/customer_type/staff/superuser flags grant none. Existing authentication,
+Workspace isolation and Workspace-first write locking remain required.
+Ordinary active geography reads remain available to customer members; only resolved
+authority can inspect inactive taxonomy. Personal setup/admin UX remains an explicit
+later product decision. Geography semantics, Range.regions, capability gating and
+structural topology enforcement are unchanged; no schema migration is added.
