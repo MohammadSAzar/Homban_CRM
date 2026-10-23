@@ -17,7 +17,7 @@ from apps.chat import general_group_realtime as rt, announcement_realtime, realt
 from apps.chat.general_group_services import set_general_group_enabled, send_general_group_message
 from apps.chat.models import GeneralGroupMessage, GeneralGroupSettings
 from apps.chat.services import open_conversation
-from apps.chat.tests.fixtures import people
+from apps.chat.tests.fixtures import authority_people as people, people as base_people, single_team
 from apps.chat.tests.test_chat import client
 from apps.chat.tests.test_realtime import socket as private_socket
 from apps.chat.tests.test_announcement_realtime import socket as announcement_socket
@@ -159,7 +159,7 @@ def test_origin_and_query_fail_closed(setup, settings):
 
 def test_ws_send_ack_one_shared_write_rest_payload_and_workspace_isolation(setup):
     people, app = setup
-    foreign_manager = User.objects.get(workspace=people.foreign_workspace, role='agency_manager')
+    foreign_manager = User.objects.get(workspace=people.foreign_workspace, role='range_manager')
     set_general_group_enabled(actor=foreign_manager, is_enabled=True)
     a, b, c = [rt.create_ticket(actor=user) for user in (people.owner, people.other, people.foreign)]
     async def run():
@@ -226,7 +226,7 @@ def test_rest_after_outer_commit_rollback_and_ids_only(setup):
 def test_delivery_reload_scoped_and_moved_sender_private(setup):
     people, app = setup
     row = send_general_group_message(actor=people.other, text='history')
-    foreign_manager = User.objects.get(workspace=people.foreign_workspace, role='agency_manager')
+    foreign_manager = User.objects.get(workspace=people.foreign_workspace, role='range_manager')
     set_general_group_enabled(actor=foreign_manager, is_enabled=True)
     foreign = send_general_group_message(actor=foreign_manager, text='foreign')
     User.objects.filter(pk=people.other.pk).update(workspace=people.foreign_workspace)

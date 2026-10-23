@@ -41,9 +41,9 @@ Personal returns legitimate no authority; unresolved mode and invalid Team topol
 fail closed. Only active Ranges count: one valid Range resolves its current active
 same-Workspace Range Manager; multiple valid Ranges require exactly one active local
 Agency Manager. Invalid/missing managers or zero active Ranges return invalid. Current
-DB state is reloaded; purchaser/owner/staff flags never select authority. No writes,
-topology repairs, schema changes or runtime consumer integration are introduced.
-Existing domain permissions, including Chat's compatibility policy, remain unchanged.
+DB state is reloaded; purchaser/owner/staff flags never select authority. C1 introduced no writes,
+topology repairs or schema changes. C2 now integrates Chat authority consumers only.
+Other domain permissions remain unchanged; Chat ordinary availability still uses its compatibility policy.
 
 The sections below include historical phase verification totals and implementation detail;
 older phase exclusions do not mean later completed features are absent.
@@ -948,22 +948,29 @@ read actions, attachments/voice, announcement history/publishing/delegation, all
 realtime tickets, socket connections and deliveries. Historical records and Notifications
 are retained; normal access can resume when the Workspace becomes Team-capable.
 
-`apps.chat.policies` centralizes the policy at the existing Workspace-first `lock_actor`
-boundary. Current active Agency Managers are equal Workspace Chat authorities. Only when
-none exist do all active Range Managers inherit publishing and delegation administration.
-An Agency Manager appearing immediately removes Range Managers' implicit global authority;
-valid retained publisher delegation can still allow them to publish, but not administer.
-Removing/deactivating the final Agency Manager restores Range Manager authority if one
-remains. No manager means Chat is unavailable. Every request/socket recheck reads current
-DB topology; no cached ticket claim grants continued access.
+C2 separates this compatibility availability check from Workspace authority. The Chat
+policy now consumes `organizations.authority.resolve_workspace_authority` inside the
+existing Workspace-first service boundary. A valid single-team Workspace resolves only
+its Range.manager, even with Agency Managers present. Valid multi-team resolves exactly
+one active local Agency Manager; every active Range must have a valid manager. Personal,
+NULL and invalid Team topology provide no Workspace Chat Authority. No purchaser, owner,
+staff or superuser fallback exists. Explicit eligible publisher delegation still permits
+publishing only, including retained delegation while canonical authority is unavailable;
+it never grants delegation administration or General Group settings access.
+
+Ordinary private/announcement/group reads, sends and realtime retain the manager-presence
+availability rule until Phase E. Thus ordinary Chat may be available without canonical
+management authority. Every existing current-state recheck remains; no ticket/protocol
+change or participant privacy bypass is introduced. No capability layer or structural
+topology enforcement is added.
 
 Delegation remains limited to active same-Workspace Range Managers/Secretaries and is not
 needed for current authorities. Existing delegation rows are preserved until explicit
 revocation. Authority never grants access to another user's private conversation.
 `customer_type`, workspace ownership, staff and superuser flags grant no Chat authority.
 No schema, dependency, ticket/protocol or notification/read lifecycle change is introduced.
-This is Chat-only compatibility, not the planned central Workspace Authority. General
-Group is implemented below; repository-wide capability/authority enforcement is deferred.
+Availability remains Chat-only compatibility; authority now uses C1. General Group is
+implemented below; other domain authority migration and central capabilities remain deferred.
 
 
 ### Internal Chat Phase 4B — General Group Foundation
@@ -986,8 +993,8 @@ the message stays in its original Workspace. No phone or raw Gregorian timestamp
 
 The unchanged centralized Chat policy applies before all access. All current active customer
 roles may read settings, and read/send when enabled, regardless of Range. Only current
-Workspace Chat Authority changes settings: Agency Managers when present, otherwise Range
-Managers. Owner/staff/superuser/customer_type confer no bypass. Authority transitions are
+Workspace Chat Authority changes settings through C1 resolution: the single operational
+Range Manager, or the unique Agency Manager in valid multi-team topology. Owner/staff/superuser/customer_type confer no bypass. Authority transitions are
 immediate without changing enabled state. Losing the final active manager denies all access but retains
 state/history; restoring a manager restores access if still enabled. These are
 compatibility-state transitions, not workspace_mode changes. Private Chat and

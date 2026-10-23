@@ -105,7 +105,7 @@ same-Workspace Range Managers for every operational Range. One Range resolves it
 manager regardless of Agency Manager presence; multiple Ranges require exactly one
 active same-Workspace Agency Manager. Zero active Ranges or malformed topology is invalid.
 Repeated Range managers remain schema-permitted; no topology is repaired or enforced.
-No purchaser/owner/staff fallback, writes, caching or consumer migration is introduced.
+The resolver introduces no purchaser/owner/staff fallback, writes or caching.
 This resolver is not endpoint authorization or a Workspace activation check. Consumers
 must retain access checks and use their Workspace-locked transaction when needed.
 
@@ -116,14 +116,20 @@ Target Team has one or more Ranges: single-team authority is the Range Manager;
 multi-team authority is an Agency Manager above managed teams. Current schema permits
 legacy states and does not enforce these invariants.
 
-The current apps.chat.policies manager-presence gate is a temporary Chat-only policy.
-It neither reads workspace_mode nor establishes a central Workspace Authority resolver.
+C2 migrates Chat announcement default publishing, delegation administration and General
+Group settings to the C1 resolver. Personal/NULL/invalid Team have no Workspace Chat
+Authority; valid single-team uses its Range Manager, valid multi-team its unique Agency
+Manager. Explicit eligible delegation remains publishing-only. Chat ordinary availability
+still uses a separate temporary manager-presence check, not workspace_mode gating.
+Private participant privacy, ordinary read/send/realtime eligibility and protocols remain
+unchanged. No capability layer or structural topology enforcement is added.
 Other domains retain role/scope rules and some owner privileges. Target owner identity
 never grants operational authority; future authority cannot override private object
 boundaries documented in PERMISSIONS.
 
 Migration remains incremental: B1 mode foundation and B2a read-only context are complete;
-B2b aligns documentation. C1 adds the unwired resolver; next come authority consumer migration,
+B2b aligns documentation. C1 adds the resolver; C2 migrates only Chat authority consumers.
+Next come remaining authority consumer migration,
 topology invariants
 (D), and capabilities (E), followed by focused feature refactors (F): Chat, Collaboration,
 Matching scopes, Daily Tasks projection, User/Range management, Notification producers,

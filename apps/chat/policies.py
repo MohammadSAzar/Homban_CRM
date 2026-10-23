@@ -4,31 +4,30 @@ from rest_framework.exceptions import PermissionDenied
 
 from apps.accounts.authentication import customer_can_authenticate
 from apps.accounts.models import User
+from apps.organizations.authority import resolve_workspace_authority
 
 
-def workspace_chat_authority_role(workspace_id):
-    """Read current topology, without caching it across requests or socket events."""
-    roles = set(User.objects.filter(
+def chat_is_available(workspace_id):
+    """Temporary manager-presence availability, independent of canonical authority."""
+    return bool(workspace_id) and User.objects.filter(
         workspace_id=workspace_id, workspace__is_active=True, is_active=True,
         role__in=(User.Role.AGENCY_MANAGER, User.Role.RANGE_MANAGER),
-    ).values_list('role', flat=True).distinct()) if workspace_id else set()
-    if User.Role.AGENCY_MANAGER in roles:
-        return User.Role.AGENCY_MANAGER
-    if User.Role.RANGE_MANAGER in roles:
-        return User.Role.RANGE_MANAGER
-    return None
+    ).exists()
 
 
 def require_chat_access(actor):
     """Actor is freshly loaded by the Workspace-first lock_actor boundary."""
     if (not customer_can_authenticate(actor) or actor.role not in User.Role.values
-            or workspace_chat_authority_role(actor.workspace_id) is None):
+            or not chat_is_available(actor.workspace_id)):
         raise PermissionDenied(_('دسترسی به گفتگو مجاز نیست.'))
 
 
 def has_workspace_chat_authority(actor):
-    return (customer_can_authenticate(actor)
-            and actor.role == workspace_chat_authority_role(actor.workspace_id))
+    if not customer_can_authenticate(actor):
+        return False
+    resolution = resolve_workspace_authority(actor.workspace)
+    return (resolution.status == 'resolved'
+            and resolution.authority_user.pk == actor.pk)
 
 
 def require_workspace_chat_authority(actor):

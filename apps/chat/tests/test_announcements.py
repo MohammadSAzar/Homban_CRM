@@ -15,7 +15,7 @@ from apps.chat.models import Announcement, AnnouncementPublisher
 from apps.chat.tests.test_chat import client
 from apps.notifications.models import Notification
 from apps.notifications.services import publish_notification
-from apps.chat.tests.fixtures import people
+from apps.chat.tests.fixtures import authority_people as people, people as base_people, single_team
 
 pytestmark = pytest.mark.django_db
 URL = '/api/v1/chat/announcements/'
@@ -222,6 +222,7 @@ def test_foreign_workspace_isolation_and_moved_identity(people, manager):
     row, _ = delegate_publisher(actor=manager, user_id=target.pk)
     publish_announcement(actor=target, text='تاریخچه')
     other_manager = people.user('manager', role='agency_manager', ws=people.foreign_workspace)
+    single_team(other_manager)
     assert client(other_manager).get(URL).data['count'] == 0
     assert client(other_manager).get(PUBLISHERS).data['count'] == 0
     assert client(other_manager).delete(f'{PUBLISHERS}{row.pk}/').status_code == 404
@@ -236,8 +237,8 @@ def test_multiple_current_managers(people, manager):
     second = people.user('second-manager', role='agency_manager')
     target = people.user('delegate', role='range_manager')
     row, _ = delegate_publisher(actor=manager, user_id=target.pk)
-    assert client(second).post(URL, {'text': 'اطلاعیه'}).status_code == 201
-    assert client(second).delete(f'{PUBLISHERS}{row.pk}/').status_code == 204
+    assert client(second).post(URL, {'text': 'اطلاعیه'}).status_code == 403
+    assert client(second).delete(f'{PUBLISHERS}{row.pk}/').status_code == 403
     User.objects.filter(pk=second.pk).update(role='admin')
     assert client(second).post(URL, {'text': 'ممنوع'}).status_code == 403
 

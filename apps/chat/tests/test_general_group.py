@@ -13,7 +13,7 @@ from rest_framework.exceptions import ValidationError as APIValidationError
 from apps.accounts.models import User
 from apps.chat.general_group_services import set_general_group_enabled, send_general_group_message
 from apps.chat.models import GeneralGroupSettings, GeneralGroupMessage, _CHAT_WRITE
-from apps.chat.tests.fixtures import people
+from apps.chat.tests.fixtures import authority_people as people, people as base_people, single_team
 from apps.chat.tests.test_chat import client
 from apps.notifications.models import Notification
 
@@ -80,17 +80,19 @@ def test_non_authorities_no_flag_bypass(people, role):
 
 
 def test_dynamic_authority_transition_keeps_participation(people):
-    User.objects.filter(pk=people.manager.pk).update(is_active=False)
-    manager = people.user('range', role='range_manager')
+    from apps.ranges.models import Range
+    manager = people.manager
     api = client(manager)
     assert api.patch(SETTINGS, {'is_enabled': True}, format='json').status_code == 200
+    agency = people.user('agency', role='agency_manager')
+    assert client(agency).patch(SETTINGS, {'is_enabled': False}, format='json').status_code == 403
     second = people.user('second-range', role='range_manager')
-    assert client(second).patch(SETTINGS, {'is_enabled': True}, format='json').status_code == 200
-    User.objects.filter(pk=people.manager.pk).update(is_active=True)
+    row = Range.objects.create(workspace=people.workspace, name='second', manager=second)
     assert api.patch(SETTINGS, {'is_enabled': False}, format='json').status_code == 403
     assert api.post(URL, {'text': 'عضو'}).status_code == 201
-    assert client(people.manager).patch(SETTINGS, {'is_enabled': False}, format='json').status_code == 200
-    User.objects.filter(pk=people.manager.pk).update(workspace=people.foreign_workspace)
+    assert client(agency).patch(SETTINGS, {'is_enabled': False}, format='json').status_code == 200
+    row.is_active = False
+    row.save()
     assert api.patch(SETTINGS, {'is_enabled': True}, format='json').status_code == 200
     assert api.get(URL).data['count'] == 1
 
@@ -151,7 +153,7 @@ def test_strict_settings_input(people):
 def test_foreign_workspace_cannot_read_or_modify_original(people):
     enable(people)
     row = send_general_group_message(actor=people.owner, text='محرمانه')
-    foreign_manager = User.objects.get(workspace=people.foreign_workspace, role='agency_manager')
+    foreign_manager = User.objects.get(workspace=people.foreign_workspace, role='range_manager')
     api = client(foreign_manager)
     assert api.get(URL).status_code == 403
     assert api.get(SETTINGS).data == {'is_enabled': False}

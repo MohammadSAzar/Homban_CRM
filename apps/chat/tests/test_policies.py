@@ -6,7 +6,8 @@ from apps.accounts.models import User
 from apps.chat import announcement_realtime, realtime
 from apps.chat.announcement_services import delegate_publisher, publish_announcement
 from apps.chat.models import Announcement, AnnouncementPublisher, Conversation, Message
-from apps.chat.policies import workspace_chat_authority_role
+from apps.chat.policies import has_workspace_chat_authority
+from apps.chat.tests.fixtures import single_team
 from apps.chat.services import open_conversation, send_message
 from apps.chat.tests.test_announcement_realtime import app, socket as announcement_socket
 from apps.chat.tests.test_attachments import private_storage
@@ -23,6 +24,7 @@ PUBLISHERS = '/api/v1/chat/announcement-publishers/'
 @pytest.fixture
 def history(people, private_storage):
     manager = people.user('manager', role='range_manager')
+    single_team(manager)
     row, _ = open_conversation(actor=people.owner, participant_id=people.other.pk)
     message = send_message(actor=people.owner, pk=row.pk,
         attachment=SimpleUploadedFile('note.txt', b'private', content_type='text/plain'))
@@ -73,25 +75,29 @@ def test_personal_denies_all_surfaces_preserves_history(people, history, action)
 @pytest.mark.parametrize('role', User.Role.values)
 def test_range_only_authority_and_private_access(people, role):
     manager = people.user('manager', role='range_manager')
+    single_team(manager)
     actor = people.user('actor', role=role)
     actor.is_staff = actor.is_superuser = actor.is_workspace_owner = True
     actor.save()
     target = people.user('delegate', role='secretary')
     api = client(actor)
     assert api.post(URL, {'participant_id': str(people.other.pk)}).status_code == 201
-    authority = role in ('agency_manager', 'range_manager')
+    authority = False  # Actor is not manager of the single operational Range.
     assert api.post(ANNOUNCEMENTS, {'text': 'اطلاعیه'}).status_code == (201 if authority else 403)
     assert api.post(PUBLISHERS, {'user_id': str(target.pk)}).status_code == (201 if authority else 403)
     assert api.get(PUBLISHERS).status_code == (200 if authority else 403)
-    assert workspace_chat_authority_role(people.workspace.pk) == (
-        'agency_manager' if role == 'agency_manager' else 'range_manager')
+    assert has_workspace_chat_authority(manager)
+    assert not has_workspace_chat_authority(actor)
 
 
 @pytest.mark.parametrize('transition', ['inactive', 'moved'])
 def test_authority_transitions_and_retained_delegation(people, transition):
     range_manager = people.user('range', role='range_manager')
+    first = single_team(range_manager)
     secretary = people.user('secretary', role='secretary')
     delegation, _ = delegate_publisher(actor=range_manager, user_id=secretary.pk)
+    from apps.ranges.models import Range
+    second = Range.objects.create(workspace=people.workspace, name='second', manager=range_manager)
     agency = people.user('agency', role='agency_manager')
     api = client(range_manager)
     assert api.post(ANNOUNCEMENTS, {'text': 'ممنوع'}).status_code == 403
@@ -102,10 +108,13 @@ def test_authority_transitions_and_retained_delegation(people, transition):
     assert api.get(PUBLISHERS).status_code == 403
     User.objects.filter(pk=agency.pk).update(**(
         {'is_active': False} if transition == 'inactive' else {'workspace': people.foreign_workspace}))
+    assert api.get(PUBLISHERS).status_code == 403
+    Range.objects.filter(pk=second.pk).update(is_active=False)
     assert api.get(PUBLISHERS).status_code == 200
     assert api.delete(f'{PUBLISHERS}{delegation.pk}/').status_code == 204
     assert AnnouncementPublisher.objects.filter(pk=retained.pk).exists()
     User.objects.filter(pk=agency.pk).update(is_active=True, workspace=people.workspace)
+    Range.objects.filter(pk=second.pk).update(is_active=True)
     assert api.get(PUBLISHERS).status_code == 403
     assert api.post(ANNOUNCEMENTS, {'text': 'تفویض محفوظ'}).status_code == 201
 
