@@ -5,15 +5,15 @@ from rest_framework.permissions import BasePermission, SAFE_METHODS
 
 from apps.accounts.authentication import customer_can_authenticate
 from apps.accounts.models import User
+from apps.accounts.policies import has_organizational_authority, is_local_range_manager
 from apps.locations.models import Region
 from .models import Range, RangeMembership
 
 
 def can_read_ranges(actor):
     return bool(actor.is_authenticated and customer_can_authenticate(actor) and (
-        actor.is_workspace_owner or actor.role in (
-            User.Role.AGENCY_MANAGER, User.Role.RANGE_MANAGER, User.Role.CONSULTANT,
-        )
+        has_organizational_authority(actor) or is_local_range_manager(actor)
+        or actor.role == User.Role.CONSULTANT
     ))
 
 
@@ -21,7 +21,7 @@ def visible_ranges(actor):
     if not can_read_ranges(actor):
         raise PermissionDenied(_("اجازه مشاهده رنج‌ها را ندارید."))
     queryset = Range.objects.filter(workspace_id=actor.workspace_id)
-    if actor.role == User.Role.AGENCY_MANAGER or actor.is_workspace_owner:
+    if has_organizational_authority(actor):
         return queryset
     if actor.role == User.Role.RANGE_MANAGER:
         return queryset.filter(manager_id=actor.pk)
@@ -30,11 +30,15 @@ def visible_ranges(actor):
     ).values("range_id"))
 
 
-def range_details(actor):
+def range_details(actor, *, saved_range=None):
     regions = Region.objects.filter(workspace_id=actor.workspace_id, city__workspace_id=actor.workspace_id)
-    if not (actor.is_workspace_owner or actor.role in (User.Role.AGENCY_MANAGER, User.Role.RANGE_MANAGER)):
+    if saved_range is None and not (has_organizational_authority(actor) or is_local_range_manager(actor)):
         regions = regions.filter(is_active=True, city__is_active=True)
-    return visible_ranges(actor).select_related("manager").annotate(
+    # A successful structural write may revoke its own authority. Serialize only
+    # that already-authorized result; subsequent reads resolve normal scope again.
+    queryset = (Range.objects.filter(pk=saved_range.pk, workspace_id=actor.workspace_id)
+                if saved_range is not None else visible_ranges(actor))
+    return queryset.select_related("manager").annotate(
         consultant_count=Count("memberships", filter=Q(
             memberships__workspace_id=actor.workspace_id,
             memberships__user__workspace_id=actor.workspace_id,
@@ -47,7 +51,7 @@ def range_details(actor):
 def require_roster_read(actor, team):
     if not can_read_ranges(actor) or team.workspace_id != actor.workspace_id:
         raise PermissionDenied(_("اجازه مشاهده فهرست مشاوران را ندارید."))
-    if not (actor.role == User.Role.AGENCY_MANAGER or actor.is_workspace_owner
+    if not (has_organizational_authority(actor)
             or (actor.role == User.Role.RANGE_MANAGER and team.manager_id == actor.pk)):
         raise PermissionDenied(_("اجازه مشاهده فهرست مشاوران را ندارید."))
 
@@ -70,5 +74,5 @@ class RangePermission(BasePermission):
         if request.method in SAFE_METHODS:
             return True
         if getattr(view, "membership_write", False):
-            return actor.role in (User.Role.AGENCY_MANAGER, User.Role.RANGE_MANAGER)
-        return actor.role == User.Role.AGENCY_MANAGER
+            return has_organizational_authority(actor) or is_local_range_manager(actor)
+        return has_organizational_authority(actor)

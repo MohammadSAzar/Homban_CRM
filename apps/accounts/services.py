@@ -8,7 +8,7 @@ from apps.organizations.models import Workspace
 from apps.ranges.models import Range, RangeMembership
 from .models import User
 from .policies import (
-    managed_range, require_creatable_role, require_manageable_target,
+    has_organizational_authority, managed_range, require_creatable_role, require_manageable_target,
     require_user_manager, visible_users,
 )
 
@@ -38,7 +38,7 @@ def lock_actor(actor):
 
 
 def resolve_assignment(actor, data, role):
-    if actor.role == User.Role.RANGE_MANAGER:
+    if not has_organizational_authority(actor):
         if "range_id" in data:
             raise ValidationError({"range_id": _("رنج مشاور به‌صورت خودکار تعیین می‌شود و قابل انتخاب نیست.")})
         return managed_range(actor, lock=True)
@@ -103,7 +103,7 @@ def create_organizational_user(*, actor, data):
 @transaction.atomic
 def update_organizational_user(*, actor, user_id, data):
     actor = lock_actor(actor)
-    if actor.role == User.Role.RANGE_MANAGER:
+    if not has_organizational_authority(actor):
         managed_range(actor, lock=True)
     # Scope lookup before validation: foreign and nonexistent UUIDs both return 404.
     if not visible_users(actor).filter(pk=user_id).exists():

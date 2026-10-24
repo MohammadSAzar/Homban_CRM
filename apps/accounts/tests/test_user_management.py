@@ -42,7 +42,7 @@ def payload(**overrides):
 @pytest.fixture
 def world(settings):
     settings.PASSWORD_HASHERS = ["django.contrib.auth.hashers.MD5PasswordHasher"]
-    workspace = Workspace.objects.create(name="مجموعه اول", slug="first", customer_type="agency_manager")
+    workspace = Workspace.objects.create(name="مجموعه اول", slug="first", customer_type="agency_manager", workspace_mode="team")
     other_workspace = Workspace.objects.create(name="مجموعه دوم", slug="second", customer_type="agency_manager")
     serial = itertools.count()
 
@@ -55,7 +55,7 @@ def world(settings):
     other_manager = make("range_manager")
     team = Range.objects.create(workspace=workspace, name="رنج اول", manager=manager)
     other_team = Range.objects.create(workspace=workspace, name="رنج دوم", manager=other_manager)
-    empty_team = Range.objects.create(workspace=workspace, name="رنج بدون مدیر")
+    empty_team = Range.objects.create(workspace=workspace, name="رنج بدون مدیر", is_active=False)
     foreign_team = Range.objects.create(workspace=other_workspace, name="رنج خارجی")
     consultant = make()
     RangeMembership.objects.create(workspace=workspace, user=consultant, range=team)
@@ -89,13 +89,13 @@ def test_agency_assigns_consultant(world):
     assert response.data["range"]["id"] == str(world.team.pk)
 
 
-def test_agency_assigns_range_manager_without_membership(world):
+def test_active_managerless_range_cannot_be_repaired_through_global_user_creation(world):
+    Range.objects.filter(pk=world.empty_team.pk).update(is_active=True)
     response = client_for(world.agency).post(URL, payload(role="range_manager", range_id=str(world.empty_team.pk)), format="json")
-    assert response.status_code == 201, response.data
+    assert response.status_code == 403
+    assert not User.objects.filter(username="new-user").exists()
     world.empty_team.refresh_from_db()
-    assert str(world.empty_team.manager_id) == response.data["id"]
-    assert not RangeMembership.objects.filter(user_id=response.data["id"]).exists()
-    assert response.data["managed_ranges"] == [{"id": str(world.empty_team.pk), "name": world.empty_team.name}]
+    assert world.empty_team.manager_id is None
 
 
 def test_existing_range_manager_is_not_replaced(world):
@@ -208,7 +208,7 @@ def test_invalid_manager_scope_fails_safely(world, state):
     elif state == "inactive":
         Range.objects.filter(pk=world.team.pk).update(is_active=False)
     elif state == "multiple":
-        Range.objects.filter(pk=world.empty_team.pk).update(manager=world.manager)
+        Range.objects.filter(pk=world.empty_team.pk).update(manager=world.manager, is_active=True)
     else:
         Range.objects.filter(pk=world.team.pk).update(workspace=world.other_workspace)
     client = client_for(world.manager)
@@ -294,7 +294,7 @@ def test_protected_update_fields_are_rejected(world, field, value):
 @pytest.mark.parametrize("target_name", ["agency", "owner", "other_agency"])
 @pytest.mark.parametrize("data", [{"first_name": "تغییر"}, {"is_active": False}])
 def test_sensitive_targets_are_read_only(world, target_name, data):
-    target = world.make("agency_manager") if target_name == "other_agency" else getattr(world, target_name)
+    target = world.make("agency_manager", is_active=False) if target_name == "other_agency" else getattr(world, target_name)
     client = client_for(world.agency)
     assert client.get(detail(target)).status_code == 200
     assert client.patch(detail(target), data, format="json").status_code == 403
@@ -374,7 +374,7 @@ def test_services_enforce_scope_without_view(world):
         create_organizational_user(actor=world.agency, data=payload())
 
 
-@pytest.mark.parametrize("actor_name,expected_queries", [("agency", 4), ("manager", 5)])
+@pytest.mark.parametrize("actor_name,expected_queries", [("agency", 16), ("manager", 17)])
 def test_management_list_has_constant_query_count(world, actor_name, expected_queries):
     client = client_for(getattr(world, actor_name))
     with CaptureQueriesContext(connection) as initial:
@@ -388,7 +388,7 @@ def test_management_list_has_constant_query_count(world, actor_name, expected_qu
     assert len(initial) == len(expanded) == expected_queries
 
 
-@pytest.mark.parametrize("actor_name,expected_queries", [("agency", 3), ("manager", 4)])
+@pytest.mark.parametrize("actor_name,expected_queries", [("agency", 15), ("manager", 16)])
 def test_detail_query_count_and_field_allowlist(world, actor_name, expected_queries):
     with CaptureQueriesContext(connection) as queries:
         response = client_for(getattr(world, actor_name)).get(detail(world.consultant))

@@ -228,3 +228,27 @@ Ordinary active geography reads remain available to customer members; only resol
 authority can inspect inactive taxonomy. Personal setup/admin UX remains an explicit
 later product decision. Geography semantics, Range.regions, capability gating and
 structural topology enforcement are unchanged; no schema migration is added.
+
+### Phase C4 — User and Range authority consumption
+Workspace-global user lists/detail, supported user creation/profile/activation and
+consultant assignment, Range structure/Region constraints and global membership
+moves now use C1 resolution. Single-team authority is its assigned Range Manager;
+valid multi-team authority is the unique Agency Manager. Personal, NULL and invalid
+topology grant no global authority. No owner/customer_type/staff/superuser shortcut
+remains. Owner is still a protected lifecycle target, not an administrator.
+Non-authority Range Managers retain self/local consultant visibility and existing
+exactly-one-active-Range consultant creation/update/add/remove rules. NULL or invalid
+global topology does not erase valid local scope. Personal legacy managers receive
+no organizational administration surface. Consultants retain membership-scoped
+Range reads; owner flags confer no global Range/roster visibility.
+Self, current authority, purchaser targets and Agency Managers remain protected
+from ordinary user lifecycle edits. Agency Manager protection is deliberately
+retained pending explicit lifecycle design, even when not current authority.
+Existing structural edits may invalidate authority (manager removal, deactivation,
+or a second Range without a unique Agency Manager). The authorized write returns
+its saved result; subsequent requests resolve current state and fail closed. No
+auto-repair/succession or topology enforcement is added. Creating an active
+managerless Range can therefore require a later controlled repair workflow; ordinary
+global APIs cannot bootstrap/repair an already invalid topology.
+No capability layer, schema migration or Personal setup workflow is introduced.
+Other domains and canonical geography remain unchanged.

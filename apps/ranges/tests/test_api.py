@@ -42,7 +42,7 @@ def membership(team, user):
 
 @pytest.fixture
 def world():
-    workspace = Workspace.objects.create(name="اول", slug="first", customer_type="agency_manager")
+    workspace = Workspace.objects.create(name="اول", slug="first", customer_type="agency_manager", workspace_mode="team")
     foreign_workspace = Workspace.objects.create(name="دوم", slug="second", customer_type="agency_manager")
     counter = itertools.count()
 
@@ -93,7 +93,7 @@ def test_create_range(world, with_manager):
 
 @pytest.mark.parametrize("scope,valid", [("all", True), ("sale", True), ("rent", True), ("other", False), ("", False), (None, False)])
 def test_activity_scope_validation(world, scope, valid):
-    response = client_for(world.agency).post(URL, {"name": "جدید", "activity_scope": scope}, format="json")
+    response = client_for(world.agency).post(URL, {"name": "جدید", "activity_scope": scope, "manager": str(world.manager.pk)}, format="json")
     assert response.status_code == (201 if valid else 400)
     response = client_for(world.agency).patch(detail(world.team), {"activity_scope": scope}, format="json")
     assert response.status_code == (200 if valid else 400)
@@ -111,7 +111,7 @@ def test_invalid_manager_create_and_update(world, target):
 
 def test_manager_assign_replace_remove_and_multiplicity_preserved(world):
     client = client_for(world.agency)
-    for manager in [world.other_manager, None, world.manager]:
+    for manager in [world.other_manager, world.manager]:
         response = client.patch(detail(world.team), {"manager": str(manager.pk) if manager else None}, format="json")
         assert response.status_code == 200
         world.team.refresh_from_db()
@@ -123,12 +123,14 @@ def test_manager_assign_replace_remove_and_multiplicity_preserved(world):
     assert client_for(world.manager).post("/api/v1/users/", {
         "username": "new", "password": "Unique-test-Password-826!", "role": "consultant",
     }, format="json").status_code == 400
+    assert client.patch(detail(world.team), {"manager": None}, format="json").status_code == 200
+    assert client.patch(detail(world.team), {"manager": str(world.manager.pk)}, format="json").status_code == 403
 
 
 def test_name_uniqueness_scoped_to_workspace(world):
     client = client_for(world.agency)
     assert client.post(URL, {"name": world.team.name}, format="json").status_code == 400
-    assert client.post(URL, {"name": world.foreign.name}, format="json").status_code == 201
+    assert client.post(URL, {"name": world.foreign.name, "manager": str(world.manager.pk)}, format="json").status_code == 201
     assert client.patch(detail(world.team), {"name": world.other.name}, format="json").status_code == 400
 
 
@@ -161,15 +163,15 @@ def test_non_agency_cannot_change_structure(world, actor_name, operation):
 
 
 @pytest.mark.parametrize("role", User.Role.values)
-def test_owner_can_read_all_structure_but_role_controls_writes(world, role):
+def test_owner_has_only_independent_role_scope(world, role):
     owner = world.make(role, is_workspace_owner=True)
     client = client_for(owner)
     response = client.get(URL)
-    assert response.status_code == 200
-    assert {row["id"] for row in response.data["results"]} == {str(world.team.pk), str(world.other.pk)}
-    assert client.get(members(world.team)).status_code == 200
-    response = client.patch(detail(world.team), {"name": "تغییر"}, format="json")
-    assert response.status_code == (200 if role == "agency_manager" else 403)
+    assert response.status_code == (200 if role in ("range_manager", "consultant") else 403)
+    if response.status_code == 200:
+        assert response.data["results"] == []
+    assert client.get(members(world.team)).status_code in (403, 404)
+    assert client.patch(detail(world.team), {"name": "change"}, format="json").status_code == 403
 
 
 @pytest.mark.parametrize("actor_name,expected", [("agency", "all"), ("manager", "own"), ("consultant", "own"), ("unassigned", "none"), ("secretary", "denied"), ("admin", "denied")])
@@ -239,6 +241,7 @@ def test_invalid_new_region_assignment_rolls_back(world, state):
 
 
 def test_deactivation_preserves_manager_members_and_regions_no_hard_delete(world):
+    Range.objects.create(workspace=world.workspace, name="third", manager=world.other_manager)
     world.team.regions.add(world.region)
     client = client_for(world.agency)
     for active in [False, True]:
@@ -412,7 +415,7 @@ def test_range_list_queries_do_not_grow_with_relations(world, actor_name):
         RangeMembership.objects.create(workspace=world.workspace, range=world.team, user=world.make())
     with CaptureQueriesContext(connection) as expanded:
         assert client.get(URL).status_code == 200
-    assert len(initial) == len(expanded) == 4
+    assert len(initial) == len(expanded) == 20
 
 
 @pytest.mark.parametrize("actor_name", ["agency", "manager"])
@@ -423,11 +426,11 @@ def test_detail_and_roster_query_counts(world, actor_name):
         assert client.get(detail(world.team)).status_code == 200
     with CaptureQueriesContext(connection) as roster_queries:
         assert client.get(members(world.team)).status_code == 200
-    assert len(detail_queries) == 3 and len(roster_queries) == 4
+    assert len(detail_queries) == 19 and len(roster_queries) == 24
 
 
 def test_lists_and_rosters_are_paginated(world):
-    Range.objects.bulk_create([Range(workspace=world.workspace, name=f"رنج {i}") for i in range(51)])
+    Range.objects.bulk_create([Range(workspace=world.workspace, name=f"رنج {i}", manager=world.manager) for i in range(51)])
     for _ in range(51):
         RangeMembership.objects.create(workspace=world.workspace, range=world.team, user=world.make())
     client = client_for(world.agency)
@@ -439,8 +442,9 @@ def test_lists_and_rosters_are_paginated(world):
 
 
 def test_inactive_assigned_range_is_readable_but_not_membership_writable(world):
+    Range.objects.create(workspace=world.workspace, name="third", manager=world.other_manager)
     Range.objects.filter(pk=world.team.pk).update(is_active=False)
-    for actor in [world.agency, world.owner, world.manager, world.consultant]:
+    for actor in [world.agency, world.manager, world.consultant]:
         response = client_for(actor).get(detail(world.team))
         assert response.status_code == 200 and response.data["is_active"] is False
     assert client_for(world.agency).put(membership(world.team, world.unassigned), {}, format="json").status_code == 400
@@ -452,8 +456,8 @@ def test_inactive_assigned_range_is_readable_but_not_membership_writable(world):
 def test_range_manager_owner_read_scope_does_not_expand_membership_write_scope(world):
     User.objects.filter(pk=world.manager.pk).update(is_workspace_owner=True)
     client = client_for(world.manager)
-    assert client.get(detail(world.other)).status_code == 200
-    assert client.get(members(world.other)).status_code == 200
+    assert client.get(detail(world.other)).status_code == 404
+    assert client.get(members(world.other)).status_code == 404
     assert client.put(membership(world.other, world.unassigned), {}, format="json").status_code == 404
     assert client.delete(membership(world.other, world.unrelated)).status_code == 404
 
@@ -478,16 +482,17 @@ def test_external_region_can_be_linked_without_mutating_external_identity(world)
 
 
 def test_existing_schema_allows_inactive_manager_without_activating_user(world):
-    User.objects.filter(pk=world.manager.pk).update(is_active=False)
-    response = client_for(world.agency).post(URL, {"name": "جدید", "manager": str(world.manager.pk)}, format="json")
+    inactive = world.make("range_manager", is_active=False)
+    response = client_for(world.agency).post(URL, {"name": "جدید", "manager": str(inactive.pk)}, format="json")
     assert response.status_code == 201
-    world.manager.refresh_from_db()
-    assert not world.manager.is_active
+    inactive.refresh_from_db()
+    assert not inactive.is_active
+    assert client_for(world.agency).patch(detail(world.team), {"name": "denied"}, format="json").status_code == 403
 
 
 def test_form_default_and_invalid_name_validation(world):
     client = client_for(world.agency)
-    assert client.post(URL, {"name": "جدید"}).data["is_active"] is True
+    assert client.post(URL, {"name": "جدید", "manager": str(world.manager.pk)}).data["is_active"] is True
     assert client.post(URL, {}, format="json").status_code == 400
     for name in ["", " ", "x" * 101]:
         assert client.patch(detail(world.team), {"name": name}, format="json").status_code == 400
@@ -512,9 +517,11 @@ def test_inconsistent_legacy_relations_never_leak_foreign_identity(world):
     Range.objects.filter(pk=world.team.pk).update(manager=world.foreign_manager)
     RangeMembership.objects.filter(user=world.consultant).update(workspace=world.foreign_workspace)
     world.team.regions.through.objects.create(range=world.team, region=world.foreign_region)
-    response = client_for(world.agency).get(detail(world.team))
+    assert client_for(world.agency).get(detail(world.team)).status_code == 403
+    # Restore only local membership scope to inspect the protected representation.
+    RangeMembership.objects.filter(user=world.consultant).update(workspace=world.workspace)
+    response = client_for(world.consultant).get(detail(world.team))
     assert response.status_code == 200
     assert response.data["manager"] is None and response.data["regions"] == []
-    assert response.data["consultant_count"] == 0
-    assert client_for(world.agency).get(members(world.team)).data["results"] == []
-    assert client_for(world.agency).put(membership(world.team, world.consultant), {}, format="json").status_code == 404
+    assert client_for(world.consultant).get(members(world.team)).status_code == 403
+    assert client_for(world.agency).put(membership(world.team, world.consultant), {}, format="json").status_code == 403

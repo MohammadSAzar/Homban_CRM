@@ -26,8 +26,7 @@ Workspace Authority will not bypass these privacy boundaries:
 - Restricted contacts and sibling scoring: existing visibility restrictions still apply.
 
 is_workspace_owner is purchaser/primary identity, not target operational authorization.
-Broader owner-based Range reads remain legacy
-exceptions until focused refactors. Staff/superuser status is not customer authority.
+C4 removes owner-based broad Range and roster reads; owner lifecycle protection remains. Staff/superuser status is not customer authority.
 
 ## CURRENT IMPLEMENTED PERMISSIONS
 Domain sections below describe current behavior unless explicitly marked future. Chat
@@ -118,20 +117,20 @@ It is not implemented; customer Admin is not an unrestricted superuser.
 
 It is not itself a job role.
 
-Target ownership grants no operational authority. Current legacy exceptions in
-Range APIs below remain implemented until later authority refactors; documenting
-them is not approval to extend owner privileges.
+Ownership grants no User/Range administrative or visibility authority. Purchasers remain
+protected lifecycle targets; that protection does not grant the actor permissions.
 
 ## Organizational user API policy
 This feature's explicit policy takes precedence over broad future capabilities:
 
 | Actor | Visible users | Creation | Updates and activation |
 | --- | --- | --- | --- |
-| Agency manager | Entire own workspace | Range manager, consultant, secretary, admin | Same-workspace users except protected targets |
-| Range manager | Self and consultants in exactly one active own range | Consultant automatically assigned to that range | Only those consultants, except workspace owners; no range selection |
+| Resolved Workspace Authority | Entire own workspace | Range manager, consultant, secretary, admin | Same-workspace users except protected targets |
+| Non-authority Range manager | Self and consultants in exactly one active own range | Consultant automatically assigned to that range | Only those consultants, except workspace owners; no range selection |
 | Consultant, secretary, admin | None through management endpoints | Denied | Denied |
 
-Protected targets are the acting user, all agency managers, and workspace owners.
+Protected targets are self, current Workspace Authority, all Agency Managers (conservative
+legacy lifecycle protection), and workspace owners. Authority replacement remains deferred.
 They may be viewed within the actor's scope but not edited/deactivated through this
 API. Ownership and Django staff/superuser status never grant management permissions.
 Self-service `/auth/me/` retains its existing read-only behavior.
@@ -144,7 +143,7 @@ generic validation error. An invalid/ambiguous range-manager scope allows only s
 visibility and prevents consultant management.
 
 Updates allow first_name, last_name, phone_number, is_active, and consultant range
-assignment by agency managers. Username, role, workspace, is_workspace_owner,
+assignment by Workspace Authority. Username, role, workspace, is_workspace_owner,
 password, Django flags, groups, and permissions are rejected on update rather than
 silently ignored. Creation uses an explicit field allowlist; extra fields are rejected.
 No hard delete or password-reset endpoint is included. Protected lifecycle operations
@@ -165,34 +164,33 @@ to the same workspace even when reading inconsistent legacy relationships.
 
 | Actor | Range reads | Structural writes | Membership writes |
 | --- | --- | --- | --- |
-| Agency manager | All own-workspace Ranges | Allowed | Add, explicit move, remove |
-| Non-agency workspace owner | All own-workspace Ranges | Denied | Operational role only |
-| Range manager | Assigned Ranges | Denied | Add unassigned consultants/remove own consultants, exactly one active managed Range |
+| Resolved Workspace Authority | All own-workspace Ranges | Allowed | Add, explicit move, remove |
+| Non-authority Range manager | Assigned Ranges | Denied | Add unassigned consultants/remove own consultants, exactly one active managed Range |
 | Consultant | Own membership's Range | Denied | Denied |
-| Non-owner secretary/admin | Denied | Denied | Denied |
+| Non-authority secretary/admin/Agency Manager | Denied | Denied | Denied |
 
-Inactive Range reads use the same scope. Rosters are visible to agency managers,
-workspace owners, and the assigned range manager, not ordinary consultants.
+Inactive Range reads use the same scope. Rosters are visible to Workspace Authority
+and the assigned Range Manager, not ordinary consultants.
 Roster/manager summaries expose only id, username, first_name, last_name; no phone,
 email, credentials, permission internals, or tokens. Nested manager, Region, roster,
 and count queries also enforce workspace consistency for legacy invalid relations.
 
-Only agency managers change name, manager, activity_scope, is_active, or regions.
+Only Workspace Authority changes name, manager, activity_scope, is_active, or regions.
 Ownership and Django staff/superuser flags never grant structural write access.
 Membership services retain protected-target checks: self and workspace-owner users
 cannot be reassigned/removed through ordinary membership operations. Consultant role
-and same-workspace membership are mandatory. Range-manager ownership grants broader
-read access only; membership writes remain restricted to their one active Range.
+and same-workspace membership are mandatory. Ownership grants no additional read or write scope; local membership writes remain
+restricted to exactly one active managed Range.
 
 The new relationship endpoints permit range managers to add unassigned consultants
 and remove own consultants; `/api/v1/users/` permissions are unchanged. Other-Range
-consultants and foreign/missing IDs are not revealed by membership writes. Agency
-manager moves require an explicit matching `from_range`; changes are transactional.
+consultants and foreign/missing IDs are not revealed by membership writes. Workspace
+Authority moves require an explicit matching `from_range`; changes are transactional.
 Range.manager allows multiple Ranges per manager in the existing schema. That
 cardinality is preserved; ambiguous active Range states block range-manager writes.
 
-Existing inactive Region constraints are visible to agency managers, owners, and
-assigned range managers. Ordinary consultants receive only active Regions under
+Existing inactive Region constraints are visible to Workspace Authority and
+assigned Range Managers. Ordinary consultants receive only active Regions under
 active Cities plus `has_region_constraints`, which remains true for hidden constraints.
 New Region assignments reject inactive Regions/Cities. Existing assignments can be
 retained/removed. Range deactivation changes no memberships or child/user active flags.
@@ -664,3 +662,27 @@ Ordinary active geography reads remain available to customer members; only resol
 authority can inspect inactive taxonomy. Personal setup/admin UX remains an explicit
 later product decision. Geography semantics, Range.regions, capability gating and
 structural topology enforcement are unchanged; no schema migration is added.
+
+### Phase C4 — User and Range authority consumption
+Workspace-global user lists/detail, supported user creation/profile/activation and
+consultant assignment, Range structure/Region constraints and global membership
+moves now use C1 resolution. Single-team authority is its assigned Range Manager;
+valid multi-team authority is the unique Agency Manager. Personal, NULL and invalid
+topology grant no global authority. No owner/customer_type/staff/superuser shortcut
+remains. Owner is still a protected lifecycle target, not an administrator.
+Non-authority Range Managers retain self/local consultant visibility and existing
+exactly-one-active-Range consultant creation/update/add/remove rules. NULL or invalid
+global topology does not erase valid local scope. Personal legacy managers receive
+no organizational administration surface. Consultants retain membership-scoped
+Range reads; owner flags confer no global Range/roster visibility.
+Self, current authority, purchaser targets and Agency Managers remain protected
+from ordinary user lifecycle edits. Agency Manager protection is deliberately
+retained pending explicit lifecycle design, even when not current authority.
+Existing structural edits may invalidate authority (manager removal, deactivation,
+or a second Range without a unique Agency Manager). The authorized write returns
+its saved result; subsequent requests resolve current state and fail closed. No
+auto-repair/succession or topology enforcement is added. Creating an active
+managerless Range can therefore require a later controlled repair workflow; ordinary
+global APIs cannot bootstrap/repair an already invalid topology.
+No capability layer, schema migration or Personal setup workflow is introduced.
+Other domains and canonical geography remain unchanged.

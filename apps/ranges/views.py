@@ -43,7 +43,7 @@ class RangeViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, viewsets.Ge
         serializer = RangeWriteSerializer(data=request.data, partial=range_id is not None)
         serializer.is_valid(raise_exception=True)
         team = save_range(actor=request.user, data=serializer.validated_data, range_id=range_id)
-        result = self.get_queryset().get(pk=team.pk)
+        result = range_details(request.user, saved_range=team).get(pk=team.pk)
         return Response(self.get_serializer(result).data,
                         status=status.HTTP_200_OK if range_id else status.HTTP_201_CREATED)
 

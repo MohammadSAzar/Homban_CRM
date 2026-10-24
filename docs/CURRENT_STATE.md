@@ -31,8 +31,7 @@ this does not claim a completed frontend or production deployment.
 Current authorization remains transitional: Chat uses active manager presence, not
 workspace_mode; Collaboration and cross-consultant Matching are not centrally Team-gated.
 Workspace Authority consumer migration, canonical Team topology enforcement, central
-capabilities and final mode NOT NULL enforcement remain future work. Legacy owner
-privileges remain in Range policies; C3 removes Location owner administration.
+capabilities and final mode NOT NULL enforcement remain future work. C3 removes Location owner administration; C4 removes owner-based Range/roster visibility.
 
 ### Phase C1 — Workspace Authority resolver foundation
 `apps.organizations.authority.resolve_workspace_authority` now provides an immutable
@@ -42,7 +41,7 @@ fail closed. Only active Ranges count: one valid Range resolves its current acti
 same-Workspace Range Manager; multiple valid Ranges require exactly one active local
 Agency Manager. Invalid/missing managers or zero active Ranges return invalid. Current
 DB state is reloaded; purchaser/owner/staff flags never select authority. C1 introduced no writes,
-topology repairs or schema changes. C2 integrates Chat authority and C3 integrates Location administration.
+topology repairs or schema changes. C2 integrates Chat, C3 Location, and C4 organizational User/Range authority.
 Other domain permissions remain unchanged; Chat ordinary availability still uses its compatibility policy.
 
 The sections below include historical phase verification totals and implementation detail;
@@ -405,18 +404,18 @@ Range Management endpoints:
 - `GET /api/v1/ranges/<uuid>/consultants/`
 - `PUT/DELETE /api/v1/ranges/<uuid>/consultants/<user_uuid>/`
 
-Only agency managers modify structural fields: name, manager (UUID/null),
+Only resolved Workspace Authority modifies structural fields: name, manager (UUID/null),
 activity_scope, regions (UUID list), is_active. PATCH is partial; Range PUT/DELETE
-are unavailable. Ownership grants workspace-wide read access, not structural writes.
+are unavailable. Ownership grants neither broader reads nor structural writes.
 Range managers read assigned Ranges; consultants read their membership's Range.
-Non-owner secretary/admin users have no Range API access. Inactive Range reads
+Non-authority secretary/admin/Agency Manager users have no Range API access. Inactive Range reads
 retain this scope. Rosters are separate paginated minimal user summaries for
-agency managers, owners, and assigned range managers.
+Workspace Authority and assigned Range Managers.
 
 Membership PUT assigns an unassigned consultant, or moves an existing membership
 with explicit `from_range` matching the current Range UUID. Same-destination PUT is
-idempotent. Relationship DELETE removes membership only. Agency managers can move
-consultants; range managers can add unassigned/remove own consultants in exactly
+idempotent. Relationship DELETE removes membership only. Workspace Authority can move
+consultants; local Range Managers can add unassigned/remove own consultants in exactly
 one active managed Range. Workspace-owner consultants remain protected targets.
 User Management and Location API behaviors are unchanged.
 
@@ -493,11 +492,12 @@ Organizational user management endpoints:
 
 `PATCH {"is_active": false}` deactivates and `true` reactivates eligible targets.
 PUT and DELETE are not exposed. Role/username/workspace/ownership are immutable.
-Agency managers see their workspace; range managers see themselves and consultants
+Workspace Authority sees the workspace; local Range Managers see themselves and consultants
 in exactly one active managed range. Consultant, secretary, and admin roles are denied.
-Self, agency-manager, and workspace-owner targets are read-only. Range-manager
-creation assigns consultants automatically; agency managers may assign/clear consultant
-membership and optionally assign a new range manager to an unoccupied active range.
+Self, current authority, Agency Manager and workspace-owner targets are read-only. Local Range-manager
+creation assigns consultants automatically; Workspace Authority may assign/clear consultant
+membership. Active managerless Ranges invalidate global authority, so the retained
+optional new-manager assignment contract cannot repair such legacy topology.
 Sensitive lifecycle operations remain a future explicit administrative workflow.
 
 Policies live in `apps/accounts/policies.py`; multi-model mutations are transactional
@@ -509,7 +509,8 @@ constraints remain in use.
 
 Read queries use select_related for consultant membership and prefetch_related for
 managed ranges. Query regression tests enforce fixed JWT-authenticated list counts
-(4 for agency managers, 5 for range managers) and detail counts (3 and 4 respectively).
+(16 for multi-team authority, 17 for local Range Managers) and detail counts (15 and 16).
+Range list/detail/roster counts are 20/19/24; resolution adds fixed queries, not N+1.
 Tests cover role/target restrictions, cross-workspace ID guessing, range consistency,
 protected payload fields, password handling, transactional rollback, pagination,
 deactivation/reactivation, and created-user login alongside existing auth regressions.
@@ -1055,3 +1056,27 @@ Ordinary active geography reads remain available to customer members; only resol
 authority can inspect inactive taxonomy. Personal setup/admin UX remains an explicit
 later product decision. Geography semantics, Range.regions, capability gating and
 structural topology enforcement are unchanged; no schema migration is added.
+
+### Phase C4 — User and Range authority consumption
+Workspace-global user lists/detail, supported user creation/profile/activation and
+consultant assignment, Range structure/Region constraints and global membership
+moves now use C1 resolution. Single-team authority is its assigned Range Manager;
+valid multi-team authority is the unique Agency Manager. Personal, NULL and invalid
+topology grant no global authority. No owner/customer_type/staff/superuser shortcut
+remains. Owner is still a protected lifecycle target, not an administrator.
+Non-authority Range Managers retain self/local consultant visibility and existing
+exactly-one-active-Range consultant creation/update/add/remove rules. NULL or invalid
+global topology does not erase valid local scope. Personal legacy managers receive
+no organizational administration surface. Consultants retain membership-scoped
+Range reads; owner flags confer no global Range/roster visibility.
+Self, current authority, purchaser targets and Agency Managers remain protected
+from ordinary user lifecycle edits. Agency Manager protection is deliberately
+retained pending explicit lifecycle design, even when not current authority.
+Existing structural edits may invalidate authority (manager removal, deactivation,
+or a second Range without a unique Agency Manager). The authorized write returns
+its saved result; subsequent requests resolve current state and fail closed. No
+auto-repair/succession or topology enforcement is added. Creating an active
+managerless Range can therefore require a later controlled repair workflow; ordinary
+global APIs cannot bootstrap/repair an already invalid topology.
+No capability layer, schema migration or Personal setup workflow is introduced.
+Other domains and canonical geography remain unchanged.

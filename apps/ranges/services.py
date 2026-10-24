@@ -4,20 +4,20 @@ from django.utils.translation import gettext_lazy as _
 from rest_framework.exceptions import NotFound, PermissionDenied, ValidationError
 
 from apps.accounts.models import User
-from apps.accounts.policies import managed_range, require_manageable_target
+from apps.accounts.policies import has_organizational_authority, managed_range, require_manageable_target
 from apps.accounts.services import lock_actor, reject_extra_fields
 from apps.locations.models import Region
 from .models import Range, RangeMembership
 
 
-def require_agency_manager(actor):
-    if actor.role != User.Role.AGENCY_MANAGER:
-        raise PermissionDenied(_("فقط مدیر املاک اجازه تغییر ساختار رنج را دارد."))
+def require_range_structure_authority(actor):
+    if not has_organizational_authority(actor):
+        raise PermissionDenied(_("فقط مدیر مجاز مجموعه اجازه تغییر ساختار رنج را دارد."))
 
 
 def _locked_range(actor, range_id):
     queryset = Range.objects.filter(workspace_id=actor.workspace_id)
-    if actor.role == User.Role.RANGE_MANAGER:
+    if not has_organizational_authority(actor):
         queryset = queryset.filter(manager_id=actor.pk)
     try:
         return queryset.select_for_update().get(pk=range_id)
@@ -41,7 +41,7 @@ def _resolve_regions(actor, team, region_ids):
 @transaction.atomic
 def save_range(*, actor, data, range_id=None):
     actor = lock_actor(actor)
-    require_agency_manager(actor)
+    require_range_structure_authority(actor)
     team = _locked_range(actor, range_id) if range_id else Range(workspace_id=actor.workspace_id)
     reject_extra_fields(data, {"name", "manager", "activity_scope", "regions", "is_active"})
     if "manager" in data:
@@ -77,7 +77,7 @@ def save_range(*, actor, data, range_id=None):
 
 def _membership_context(actor, range_id, user_id):
     team = _locked_range(actor, range_id)
-    if actor.role == User.Role.RANGE_MANAGER:
+    if not has_organizational_authority(actor):
         own = managed_range(actor, lock=True)
         if own.pk != team.pk:
             raise PermissionDenied(_("فقط مدیریت اعضای رنج فعال خودتان مجاز است."))
@@ -89,7 +89,7 @@ def _membership_context(actor, range_id, user_id):
     if membership and (membership.workspace_id != actor.workspace_id
                        or membership.range.workspace_id != actor.workspace_id):
         raise NotFound(_("مشاور یافت نشد."))
-    if actor.role == User.Role.RANGE_MANAGER and membership and membership.range_id != team.pk:
+    if not has_organizational_authority(actor) and membership and membership.range_id != team.pk:
         raise NotFound(_("مشاور یافت نشد."))
     if user.role != User.Role.CONSULTANT:
         raise ValidationError({"user": _("فقط مشاور می‌تواند عضو رنج باشد.")})
@@ -104,7 +104,7 @@ def assign_consultant(*, actor, range_id, user_id, data):
     reject_extra_fields(data, {"from_range"})
     if not team.is_active:
         raise ValidationError({"range": _("انتساب مشاور به رنج غیرفعال مجاز نیست.")})
-    if actor.role == User.Role.RANGE_MANAGER and "from_range" in data:
+    if not has_organizational_authority(actor) and "from_range" in data:
         raise ValidationError({"from_range": _("انتقال مشاور از رنج دیگر برای شما مجاز نیست.")})
     if membership and membership.range_id == team.pk:
         return membership
