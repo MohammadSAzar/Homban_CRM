@@ -252,3 +252,13 @@ managerless Range can therefore require a later controlled repair workflow; ordi
 global APIs cannot bootstrap/repair an already invalid topology.
 No capability layer, schema migration or Personal setup workflow is introduced.
 Other domains and canonical geography remain unchanged.
+
+### Phase D2a — Read-only target topology validation
+`apps.organizations.topology.validate_workspace_topology` returns an immutable
+status/mode/topology/errors result with stable diagnostic codes. Personal permits
+no active Ranges; NULL mode remains unresolved. Team requires valid active
+same-Workspace Range Managers, at most one active Range per manager, and exactly
+one active Agency Manager only for multi-team topology. Inactive assignments are
+excluded. C1 authority resolution remains unchanged, including its existing
+interpretation of repeated managers. No write consumer uses this validator yet:
+enforcement, provisioning, repair and atomic transitions remain unimplemented.
