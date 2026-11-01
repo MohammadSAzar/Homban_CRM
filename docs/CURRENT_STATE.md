@@ -1090,3 +1090,15 @@ one active Agency Manager only for multi-team topology. Inactive assignments are
 excluded. C1 authority resolution remains unchanged, including its existing
 interpretation of repeated managers. No write consumer uses this validator yet:
 enforcement, provisioning, repair and atomic transitions remain unimplemented.
+
+### Phase D2b — Internal topology transaction foundation
+`organizations.topology_services.topology_transaction` locks Workspace first,
+then declared same-Workspace Users and Ranges in primary-key order. Trusted callers
+must authorize separately; this internal boundary grants no customer permissions.
+Final persisted state must pass D2a validation before transaction exit, otherwise
+all enclosed writes and on-commit callbacks roll back. Nested use awaits the outer
+transaction for durability. `bootstrap_team_first_range` creates only the first
+active Range for an existing active Team and existing eligible Range Manager;
+existing active Ranges are rejected. C1 and D2a remain unchanged. Ordinary API
+enforcement, automatic repair, transitions/replacement and complete onboarding
+remain deferred. No schema migration is added.
