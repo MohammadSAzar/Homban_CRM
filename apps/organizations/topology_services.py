@@ -9,6 +9,7 @@ from dataclasses import dataclass
 
 from django.core.exceptions import ValidationError
 from django.db import transaction
+from django.db.models import Q
 
 from apps.accounts.models import User
 from apps.ranges.models import Range
@@ -50,6 +51,7 @@ def topology_transaction(*, workspace_id, user_ids=(), range_ids=(), include_cur
     bootstrap/repair of invalid states. It grants no customer permission.
     Transitions may discover active topology IDs under the Workspace lock before
     acquiring any User/Range locks, preserving the same deterministic lock order.
+    Managers of explicitly requested inactive Ranges are included for activation.
     """
     with transaction.atomic():
         workspace = Workspace.objects.select_for_update().filter(pk=workspace_id).first()
@@ -57,10 +59,11 @@ def topology_transaction(*, workspace_id, user_ids=(), range_ids=(), include_cur
             raise TopologyMutationError("workspace_missing")
         user_ids, range_ids = set(map(str, user_ids)), set(map(str, range_ids))
         if include_current_topology:
-            active_ranges = list(Range.objects.filter(workspace=workspace, is_active=True)
-                                 .values_list("pk", "manager_id"))
-            range_ids.update(str(pk) for pk, _ in active_ranges)
-            user_ids.update(str(manager) for _, manager in active_ranges if manager is not None)
+            discovered_ranges = list(Range.objects.filter(workspace=workspace)
+                                     .filter(Q(is_active=True) | Q(pk__in=range_ids))
+                                     .values_list("pk", "manager_id"))
+            range_ids.update(str(pk) for pk, _ in discovered_ranges)
+            user_ids.update(str(manager) for _, manager in discovered_ranges if manager is not None)
             user_ids.update(str(pk) for pk in User.objects.filter(
                 workspace=workspace, is_active=True, role=User.Role.AGENCY_MANAGER,
             ).values_list("pk", flat=True))

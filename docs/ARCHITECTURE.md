@@ -290,3 +290,15 @@ Outgoing owner Agency replacement is rejected (`outgoing_agency_manager_is_owner
 pending explicit owner lifecycle design; incoming legacy owner status is allowed.
 No ordinary API enforcement, complete onboarding, generic repair, automatic role
 conversion/user creation or schema migration is introduced.
+
+### Phase D2c.1 — Multi-team expansion and prepared Range activation
+Internal `add_active_range_to_multi_team` adds one eligible managed active Range
+to valid multi-team topology while preserving its Agency authority.
+`activate_prepared_range` activates an existing inactive Range without changing
+its manager, memberships or Regions. Single-to-multi activation requires explicit
+existing active Agency designation; multi-team activation preserves current Agency
+authority and rejects a conflicting designation. Both use D2b locking and final
+D2a validation with C1 verification. Manager discovery includes the requested
+inactive Range before User/Range locks. Zero-to-one prepared restoration remains
+deferred to repair design. No ordinary API wiring, onboarding, automatic role
+conversion/user creation or schema migration is introduced.

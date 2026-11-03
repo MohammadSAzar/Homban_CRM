@@ -128,3 +128,46 @@ def replace_multi_team_agency_manager(*, workspace_id, incoming_agency_manager_i
         require_valid_locked_topology(locked.workspace)
         _verify_authority(locked.workspace, incoming.pk)
     return incoming
+
+
+def add_active_range_to_multi_team(*, workspace_id, manager_id, range_name,
+                                   activity_scope=Range.ActivityScope.ALL):
+    """Expand valid multi-team topology without changing its Agency authority."""
+    with topology_transaction(workspace_id=workspace_id, user_ids=(manager_id,),
+                              include_current_topology=True) as locked:
+        authority_id = _start(locked, "multi_team")
+        manager = _user(locked, manager_id, User.Role.RANGE_MANAGER)
+        _unassigned(manager)
+        row = Range(workspace=locked.workspace, manager=manager, name=range_name,
+                    activity_scope=activity_scope, is_active=True)
+        _save_range(row)
+        require_valid_locked_topology(locked.workspace)
+        _verify_authority(locked.workspace, authority_id)
+    return row
+
+
+def activate_prepared_range(*, workspace_id, range_id, agency_manager_id=None):
+    """Activate an existing prepared Range; never bootstrap or replace a manager."""
+    user_ids = () if agency_manager_id is None else (agency_manager_id,)
+    with topology_transaction(workspace_id=workspace_id, user_ids=user_ids,
+                              range_ids=(range_id,), include_current_topology=True) as locked:
+        authority_id = _start(locked)  # D2a rejects zero active Ranges as well.
+        row = next(row for row in locked.ranges if str(row.pk) == str(range_id))
+        if row.is_active:
+            raise TopologyMutationError("range_already_active")
+        if row.manager_id is None:
+            raise TopologyMutationError("prepared_range_missing_manager")
+        manager = _user(locked, row.manager_id, User.Role.RANGE_MANAGER)
+        _unassigned(manager)
+        if sum(team.is_active for team in locked.ranges) == 1:
+            if agency_manager_id is None:
+                raise TopologyMutationError("agency_manager_required")
+            agency = _user(locked, agency_manager_id, User.Role.AGENCY_MANAGER)
+            authority_id = agency.pk
+        elif agency_manager_id is not None and str(agency_manager_id) != str(authority_id):
+            raise TopologyMutationError("agency_manager_authority_mismatch")
+        row.is_active = True
+        _save_range(row, update_fields=["is_active", "updated_at"])
+        require_valid_locked_topology(locked.workspace)
+        _verify_authority(locked.workspace, authority_id)
+    return row
