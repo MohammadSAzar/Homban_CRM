@@ -1102,3 +1102,19 @@ active Range for an existing active Team and existing eligible Range Manager;
 existing active Ranges are rejected. C1 and D2a remain unchanged. Ordinary API
 enforcement, automatic repair, transitions/replacement and complete onboarding
 remain deferred. No schema migration is added.
+
+### Phase D2c — Explicit internal atomic topology transitions
+`organizations.topology_transitions` adds single-to-multi and multi-to-single
+transitions, active Range Manager replacement, and multi-team Agency Manager
+replacement. Each requires a valid active Team starting state and uses D2b's
+Workspace-first boundary with deterministically locked current Users/Ranges,
+canonical D2a final validation and C1 authority verification. C1/D2a are unchanged.
+Single-to-multi uses existing active Agency/Range Managers; multi-to-single retains
+inactive Range history and the former Agency account, handing authority to the
+kept Range Manager. Range replacement leaves the outgoing user active. Agency
+replacement activates an explicitly selected existing inactive Agency Manager and
+deactivates the outgoing one atomically, preserving roles and owner flags.
+Outgoing owner Agency replacement is rejected (`outgoing_agency_manager_is_owner`)
+pending explicit owner lifecycle design; incoming legacy owner status is allowed.
+No ordinary API enforcement, complete onboarding, generic repair, automatic role
+conversion/user creation or schema migration is introduced.
