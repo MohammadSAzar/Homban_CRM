@@ -1177,3 +1177,37 @@ single-to-multi activation remains internal; its customer contract is deferred.
 Legacy repair, complete onboarding and owner Agency lifecycle remain deferred.
 No generic repair, automatic successor/role conversion, capability gating or schema
 migration is introduced.
+
+### Phase D2e.1 — Read-only legacy inventory and reviewed plans
+`topology_inventory.inventory_workspace(id)` and `inventory_workspaces(ids=None)`
+combine canonical D2a validity and C1 authority with deterministic, contact-free
+context, historical warnings and a SHA-256 state token. Query count is bounded per
+Workspace (not per Range); all-Workspace inventory streams IDs and reuses canonical
+resolvers. `manage.py topology_inventory` defaults to all Workspaces; repeated
+`--workspace UUID`, `--json` and `--invalid-only` are supported. Invalid/unresolved
+rows are inventory data, not a command failure. Owner Agency warnings identify a
+potential lifecycle blocker, not a D2a validity failure.
+
+`topology_repair_plan.parse_repair_plan` accepts strict version-1 JSON-shaped data:
+workspace_id, expected_state_token (from inventory), expected_workspace_mode,
+expected_d2a_status, expected_d2a_errors (sorted unique list), operations, reviewer
+and reason. Reviewer/reason are required; operations have explicit allowlisted IDs
+and values. Bootstrap specifies manager_id/range_name/activity_scope; active manager
+assignment/replacement specifies range_id/manager_id; deactivation specifies range_id;
+Agency activity specifies user_id; inactive-link repair specifies range_id and an
+explicit manager_id (or null to clear); classification explicitly specifies mode.
+
+`validate_repair_plan` performs read-only preflight: stale-state comparison, local
+reference/eligibility checks and outgoing owner Agency deactivation blocking.
+The token includes mode/activity, all Range manager assignments/eligibility and local
+user role/activity/owner state; missing/foreign candidates share one internal error.
+Foreign legacy FK replacement/clearing targets only the local Range. Inactive null,
+inactive or repeated managers are tolerated; foreign/wrong-role history is warned.
+
+A valid dry-run means the starting state and plan references pass preflight, NOT
+that the proposed final topology was simulated or certified. Results explicitly
+warn `final_topology_not_simulated`. No locks/snapshot guarantee are provided: D2e.2
+must recheck under Workspace lock and validate final D2a state before commit.
+NULL classification remains explicit/manual with no purchaser/role/count inference.
+No repair application, customer API, admin action or schema migration exists in
+D2e.1. Owner Agency lifecycle and repair application remain deferred.
