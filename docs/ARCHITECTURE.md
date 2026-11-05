@@ -244,12 +244,11 @@ Range reads; owner flags confer no global Range/roster visibility.
 Self, current authority, purchaser targets and Agency Managers remain protected
 from ordinary user lifecycle edits. Agency Manager protection is deliberately
 retained pending explicit lifecycle design, even when not current authority.
-Existing structural edits may invalidate authority (manager removal, deactivation,
-or a second Range without a unique Agency Manager). The authorized write returns
-its saved result; subsequent requests resolve current state and fail closed. No
-auto-repair/succession or topology enforcement is added. Creating an active
-managerless Range can therefore require a later controlled repair workflow; ordinary
-global APIs cannot bootstrap/repair an already invalid topology.
+D2d-2 now constrains topology-changing structural edits to valid transitions;
+active manager removal and implicit single-to-multi expansion are rejected.
+An authorized transition returns its saved result even after authority handoff;
+subsequent requests resolve current authority. Ordinary global APIs cannot
+bootstrap or repair invalid legacy topology. No automatic succession is added.
 No capability layer, schema migration or Personal setup workflow is introduced.
 Other domains and canonical geography remain unchanged.
 
@@ -260,8 +259,9 @@ no active Ranges; NULL mode remains unresolved. Team requires valid active
 same-Workspace Range Managers, at most one active Range per manager, and exactly
 one active Agency Manager only for multi-team topology. Inactive assignments are
 excluded. C1 authority resolution remains unchanged, including its existing
-interpretation of repeated managers. No write consumer uses this validator yet:
-enforcement, provisioning, repair and atomic transitions remain unimplemented.
+interpretation of repeated managers. D2b/D2c subsequently added internal mutation
+consumers; D2d-2 now integrates ordinary structural writes. Provisioning and legacy
+repair remain deferred.
 
 ### Phase D2b — Internal topology transaction foundation
 `organizations.topology_services.topology_transaction` locks Workspace first,
@@ -271,9 +271,9 @@ Final persisted state must pass D2a validation before transaction exit, otherwis
 all enclosed writes and on-commit callbacks roll back. Nested use awaits the outer
 transaction for durability. `bootstrap_team_first_range` creates only the first
 active Range for an existing active Team and existing eligible Range Manager;
-existing active Ranges are rejected. C1 and D2a remain unchanged. Ordinary API
-enforcement, automatic repair, transitions/replacement and complete onboarding
-remain deferred. No schema migration is added.
+existing active Ranges are rejected. C1 and D2a remain unchanged. D2c added
+transitions/replacement and D2d-2 adds customer mutation enforcement; automatic
+repair and complete onboarding remain deferred. No schema migration is added.
 
 ### Phase D2c — Explicit internal atomic topology transitions
 `organizations.topology_transitions` adds single-to-multi and multi-to-single
@@ -288,8 +288,9 @@ replacement activates an explicitly selected existing inactive Agency Manager an
 deactivates the outgoing one atomically, preserving roles and owner flags.
 Outgoing owner Agency replacement is rejected (`outgoing_agency_manager_is_owner`)
 pending explicit owner lifecycle design; incoming legacy owner status is allowed.
-No ordinary API enforcement, complete onboarding, generic repair, automatic role
-conversion/user creation or schema migration is introduced.
+D2c itself adds no ordinary API enforcement; D2d-2 supplies the customer integration.
+Complete onboarding, generic repair and automatic role conversion/user creation
+remain absent. No schema migration is introduced.
 
 ### Phase D2c.1 — Multi-team expansion and prepared Range activation
 Internal `add_active_range_to_multi_team` adds one eligible managed active Range
@@ -300,5 +301,50 @@ existing active Agency designation; multi-team activation preserves current Agen
 authority and rejects a conflicting designation. Both use D2b locking and final
 D2a validation with C1 verification. Manager discovery includes the requested
 inactive Range before User/Range locks. Zero-to-one prepared restoration remains
-deferred to repair design. No ordinary API wiring, onboarding, automatic role
-conversion/user creation or schema migration is introduced.
+deferred to repair design. D2d-2 subsequently wires ordinary multi-team expansion
+and activation. No onboarding, automatic role conversion/user creation or schema
+migration is introduced.
+
+### Phase D2d-2 — Customer User/Range topology enforcement
+Topology-changing Range writes now use D2b/D2c/D2c.1 with canonical D2a validation
+and C1 authority. Workspace is locked first; the current actor is reloaded and
+authorized under that lock, before D2b locks relevant Users by PK then Ranges by
+PK. No early actor User lock is added: cooperating management writes serialize on
+the same Workspace, and D2b includes current authority among its ordered Users.
+
+Ordinary active Range creation and prepared activation require valid multi-team
+topology and preserve Agency authority. Zero-to-one bootstrap and implicit
+single-to-multi expansion are rejected. Active manager replacement delegates to
+D2c; unchanged manager is a no-op, and clearing an active manager is rejected.
+Last active Range deactivation is rejected; two-to-one delegates to D2c and hands
+authority to the remaining manager; N>=3 deactivation validates the final state
+and retains Agency authority. Inactive history, memberships and Regions remain.
+Each request permits at most one topology-changing intent. Neutral name,
+activity_scope and Region changes may accompany it atomically; any failure rolls
+back the transition and its on-commit callbacks.
+
+Explicit Workspace-Authority-only workflows:
+
+- `POST /api/v1/ranges/expand/`: `agency_manager_id`, `new_range_manager_id`,
+  `new_range_name`, optional `activity_scope` and `regions`; returns the created
+  Range (201) after an atomic single-to-multi handoff.
+- `POST /api/v1/ranges/replace-agency-manager/`: `incoming_agency_manager_id`;
+  activates an existing inactive Agency Manager and deactivates the outgoing
+  authority atomically (204). Outgoing owner Agency replacement remains blocked;
+  owner flags and roles are never transferred or changed.
+
+User activity changes are rejected for any target managing an active Range,
+including reactivation of an invalid legacy assignment. Ordinary Agency lifecycle
+PATCH remains protected. User creation cannot fill an active managerless Range;
+unassigned manager candidates and existing supported non-manager roles remain
+creatable. Profile changes, consultant membership, local Range Manager scope and
+inactive Range preparation retain their existing policies without blanket global
+D2a validation. Invalid/NULL global topology does not erase valid local scope.
+Owner/customer_type/staff/superuser confer no authority. Foreign/missing resources
+remain non-disclosing and internal topology codes map to Persian API validation.
+
+C1/D2a semantics and D2b/D2c/D2c.1 primitives are unchanged. Explicit prepared
+single-to-multi activation remains internal; its customer contract is deferred.
+Legacy repair, complete onboarding and owner Agency lifecycle remain deferred.
+No generic repair, automatic successor/role conversion, capability gating or schema
+migration is introduced.

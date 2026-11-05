@@ -18,6 +18,18 @@ class MembershipWriteSerializer(StrictInputSerializer):
     from_range = serializers.UUIDField(required=False, allow_null=True, label=_("رنج فعلی"))
 
 
+class SingleTeamExpansionSerializer(StrictInputSerializer):
+    agency_manager_id = serializers.UUIDField(label=_("مدیر املاک"))
+    new_range_manager_id = serializers.UUIDField(label=_("مدیر رنج جدید"))
+    new_range_name = serializers.CharField(max_length=100, label=_("نام رنج جدید"))
+    activity_scope = serializers.ChoiceField(choices=Range.ActivityScope.choices, required=False, label=_("حوزه فعالیت"))
+    regions = serializers.ListField(child=serializers.UUIDField(), required=False, allow_empty=True, label=_("مناطق"))
+
+
+class AgencyReplacementSerializer(StrictInputSerializer):
+    incoming_agency_manager_id = serializers.UUIDField(label=_("مدیر املاک جایگزین"))
+
+
 class UserSummarySerializer(serializers.ModelSerializer):
     class Meta:
         model = User

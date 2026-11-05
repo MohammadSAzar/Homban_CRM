@@ -10,6 +10,8 @@ from .models import Range
 from .policies import RangePermission, range_details, roster_queryset, visible_ranges
 from .serializers import MembershipWriteSerializer, RangeReadSerializer, RangeWriteSerializer, UserSummarySerializer
 from .services import assign_consultant, remove_consultant, save_range
+from .services import expand_single_team, replace_agency_authority
+from .serializers import SingleTeamExpansionSerializer, AgencyReplacementSerializer
 
 
 class RangePagination(PageNumberPagination):
@@ -81,4 +83,26 @@ class RangeMembershipView(APIView):
         serializer = StrictInputSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         remove_consultant(actor=request.user, range_id=pk, user_id=user_id, data=serializer.validated_data)
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class SingleTeamExpansionView(APIView):
+    permission_classes = [RangePermission]
+
+    def post(self, request):
+        serializer = SingleTeamExpansionSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        team = expand_single_team(actor=request.user, data=serializer.validated_data)
+        result = range_details(request.user, saved_range=team).get(pk=team.pk)
+        return Response(RangeReadSerializer(result).data, status=status.HTTP_201_CREATED)
+
+
+class AgencyReplacementView(APIView):
+    permission_classes = [RangePermission]
+
+    def post(self, request):
+        serializer = AgencyReplacementSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        replace_agency_authority(actor=request.user, data=serializer.validated_data)
+        # Acknowledge the authorized operation even though this actor is now inactive.
         return Response(status=status.HTTP_204_NO_CONTENT)

@@ -454,9 +454,11 @@ def test_similar_password_rejected_using_candidate_profile(world):
     assert response.status_code == 400 and "password" in response.data
 
 
-def test_manager_deactivation_keeps_range_and_consultants(world):
+def test_active_manager_deactivation_rejected_and_preserves_relationships(world):
     response = client_for(world.agency).patch(detail(world.manager), {"is_active": False}, format="json")
-    assert response.status_code == 200
+    assert response.status_code == 400 and "is_active" in response.data
+    world.manager.refresh_from_db()
+    assert world.manager.is_active
     world.team.refresh_from_db()
     world.consultant.refresh_from_db()
     assert world.team.manager_id == world.manager.pk

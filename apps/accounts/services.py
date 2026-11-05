@@ -70,8 +70,8 @@ def create_organizational_user(*, actor, data):
     reject_extra_fields(data, CREATE_FIELDS)
     require_creatable_role(actor, data["role"])
     team = resolve_assignment(actor, data, data["role"])
-    if team and data["role"] == User.Role.RANGE_MANAGER and team.manager_id:
-        raise ValidationError({"range_id": _("این رنج مدیر دارد؛ جایگزینی مدیر در این عملیات مجاز نیست.")})
+    if team and data["role"] == User.Role.RANGE_MANAGER:
+        raise ValidationError({"range_id": _("انتساب مدیر به رنج فعال از مسیر ایجاد کاربر مجاز نیست؛ از فرایند جایگزینی مدیر استفاده کنید.")})
     username = User.normalize_username(data["username"])
     if User.objects.filter(workspace_id=actor.workspace_id, username=username).exists():
         raise ValidationError({"username": _("این نام کاربری در مجموعه استفاده شده است.")})
@@ -111,6 +111,9 @@ def update_organizational_user(*, actor, user_id, data):
     target = User.objects.select_for_update().get(pk=user_id, workspace_id=actor.workspace_id)
     require_manageable_target(actor, target)
     reject_extra_fields(data, UPDATE_FIELDS)
+    if ("is_active" in data and data["is_active"] != target.is_active
+            and Range.objects.filter(manager_id=target.pk, is_active=True).exists()):
+        raise ValidationError({"is_active": _("تغییر وضعیت مدیرِ رنج فعال از این مسیر مجاز نیست؛ جایگزینی یا بررسی ساختار باید جداگانه انجام شود.")})
     if "range_id" in data:
         if target.role != User.Role.CONSULTANT:
             raise ValidationError({"range_id": _("تغییر عضویت رنج فقط برای مشاور مجاز است.")})

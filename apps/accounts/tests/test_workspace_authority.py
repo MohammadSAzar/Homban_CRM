@@ -33,12 +33,15 @@ def test_authority_creates_global_roles_and_sees_workspace(world, topology, role
 @pytest.mark.parametrize("operation", ["name", "manager", "activity_scope", "regions", "is_active"])
 def test_single_authority_structural_mutations_return_saved_result(world, operation):
     actor = single(world)
-    data = {"name": "renamed", "manager": None, "activity_scope": "sale", "regions": [], "is_active": False}
+    incoming = world.make("range_manager")
+    data = {"name": "renamed", "manager": str(incoming.pk), "activity_scope": "sale", "regions": [], "is_active": False}
     response = client_for(actor).patch(range_detail(world.team), {operation: data[operation]}, format="json")
-    assert response.status_code == 200, response.data
-    if operation in ("manager", "is_active"):
-        assert resolve_workspace_authority(world.workspace).status == "invalid"
+    assert response.status_code == (400 if operation == "is_active" else 200), response.data
+    if operation == "manager":
+        assert resolve_workspace_authority(world.workspace).authority_user.pk == incoming.pk
         assert client_for(actor).patch(range_detail(world.team), {"name": "denied"}, format="json").status_code in (403, 404)
+    else:
+        assert resolve_workspace_authority(world.workspace).authority_user.pk == actor.pk
 
 
 @pytest.mark.parametrize("role", ["agency_manager", "consultant", "secretary", "admin"])
@@ -135,15 +138,20 @@ def test_dynamic_topology_creation_and_authority_handoff(world):
     User.objects.filter(pk=world.agency.pk).update(is_active=False)
     client = client_for(actor)
     response = client.post(RANGES, {"name": "second active", "manager": str(world.other_manager.pk)}, format="json")
-    assert response.status_code == 201, response.data
-    assert resolve_workspace_authority(world.workspace).status == "invalid"
-    assert client.patch(range_detail(world.team), {"name": "denied"}, format="json").status_code == 403
+    assert response.status_code == 400, response.data
+    assert resolve_workspace_authority(world.workspace).authority_user.pk == actor.pk
     User.objects.filter(pk=world.agency.pk).update(is_active=True)
+    response = client.post(RANGES + "expand/", {
+        "agency_manager_id": str(world.agency.pk), "new_range_manager_id": str(world.other_manager.pk),
+        "new_range_name": "second active",
+    }, format="json")
+    assert response.status_code == 201, response.data
     assert resolve_workspace_authority(world.workspace).authority_user.pk == world.agency.pk
+    assert client.patch(range_detail(world.team), {"name": "denied"}, format="json").status_code == 403
     extra = world.make("agency_manager")
     assert resolve_workspace_authority(world.workspace).status == "invalid"
     User.objects.filter(pk=extra.pk).update(is_active=False)
-    Range.objects.filter(pk=response.data["id"]).update(is_active=False)
+    assert client_for(world.agency).patch(RANGES + response.data["id"] + "/", {"is_active": False}, format="json").status_code == 200
     assert resolve_workspace_authority(world.workspace).authority_user.pk == actor.pk
 
 
