@@ -87,28 +87,41 @@ def bootstrap_team_first_range(*, workspace_id, manager_id, range_name,
     try:
         with topology_transaction(workspace_id=workspace_id, user_ids=(manager_id,)) as locked:
             workspace = locked.workspace
-            if not workspace.is_active:
-                raise TopologyMutationError("workspace_inactive")
-            if workspace.workspace_mode != Workspace.WorkspaceMode.TEAM:
-                raise TopologyMutationError("workspace_not_team")
-            if Range.objects.filter(workspace=workspace, is_active=True).exists():
-                raise TopologyMutationError("team_already_has_active_range")
-            manager = locked.users[0]
-            if not manager.is_active:
-                raise TopologyMutationError("manager_inactive")
-            if manager.role != User.Role.RANGE_MANAGER:
-                raise TopologyMutationError("manager_wrong_role")
-            if Range.objects.filter(manager=manager, is_active=True).exists():
-                raise TopologyMutationError("range_manager_multiple_active_ranges")
-            team = Range(workspace=workspace, manager=manager, name=range_name,
-                         activity_scope=activity_scope, is_active=True)
-            try:
-                team.save()  # Existing Range.full_clean(), including name uniqueness.
-            except ValidationError as error:
-                raise TopologyMutationError("range_validation_failed") from error
+            team = _bootstrap_team_first_range_locked(
+                workspace=workspace, manager=locked.users[0], range_name=range_name,
+                activity_scope=activity_scope,
+            )
         return team
     except TopologyMutationError as error:
         if error.errors == ("user_missing_or_wrong_workspace",):
             code = "manager_wrong_workspace" if User.objects.filter(pk=manager_id).exists() else "manager_missing"
             raise TopologyMutationError(code) from error
         raise
+
+
+def _bootstrap_team_first_range_locked(*, workspace, manager, range_name, activity_scope):
+    """Already-locked mutation shared by bootstrap and reviewed repair.
+
+    Caller holds Workspace then local User/Range locks and owns final validation.
+    """
+    if manager.workspace_id != workspace.pk:
+        raise TopologyMutationError("manager_wrong_workspace")
+    if not workspace.is_active:
+        raise TopologyMutationError("workspace_inactive")
+    if workspace.workspace_mode != Workspace.WorkspaceMode.TEAM:
+        raise TopologyMutationError("workspace_not_team")
+    if Range.objects.filter(workspace=workspace, is_active=True).exists():
+        raise TopologyMutationError("team_already_has_active_range")
+    if not manager.is_active:
+        raise TopologyMutationError("manager_inactive")
+    if manager.role != User.Role.RANGE_MANAGER:
+        raise TopologyMutationError("manager_wrong_role")
+    if Range.objects.filter(manager=manager, is_active=True).exists():
+        raise TopologyMutationError("range_manager_multiple_active_ranges")
+    team = Range(workspace=workspace, manager=manager, name=range_name,
+                 activity_scope=activity_scope, is_active=True)
+    try:
+        team.save()  # Existing Range.full_clean(), including name uniqueness.
+    except ValidationError as error:
+        raise TopologyMutationError("range_validation_failed") from error
+    return team

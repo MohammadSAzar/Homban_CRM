@@ -381,4 +381,46 @@ warn `final_topology_not_simulated`. No locks/snapshot guarantee are provided: D
 must recheck under Workspace lock and validate final D2a state before commit.
 NULL classification remains explicit/manual with no purchaser/role/count inference.
 No repair application, customer API, admin action or schema migration exists in
-D2e.1. Owner Agency lifecycle and repair application remain deferred.
+D2e.1. D2e.2 application is described below; owner Agency lifecycle remains deferred.
+
+
+### Phase D2e.2 — Trusted reviewed repair application
+`topology_repair.apply_repair_plan` applies one strictly parsed, reviewed RepairPlan
+inside its own outermost transaction; nested callers are rejected. Repair is an
+internal operational boundary, never customer authorization through purchaser,
+owner, staff or superuser flags. No customer API or admin action is provided.
+
+Workspace is locked before inventory/preflight reads. The existing D2b boundary
+then locks explicit local Users by PK followed by local Ranges by PK; foreign
+legacy managers are never locked or modified. Stale tokens/expectations and plan
+preconditions are rechecked before and after subordinate locks. Operations run in
+canonical order: mode, active manager assignment/replacement, inactive-link cleanup,
+Range deactivation, Agency deactivation/activation, then first-Range bootstrap.
+File order cannot change execution semantics. Bootstrap shares D2b's already-locked
+helper; its public contract is unchanged. Final persisted D2a validity and C1
+consistency are mandatory; failure rolls back the entire repair.
+
+Malformed foreign/wrong-role manager links may be explicitly retained on a
+Range being deactivated. Only this repair case bypasses Range.full_clean through
+a scoped update of is_active/updated_at, checking one affected row and refreshing.
+Other Range writes use existing validation. History, memberships and Regions are
+preserved. Agency activity uses normal User tracking; transactional Matching work
+and callbacks roll back with repair. Callbacks publish after outer commit; a later
+delivery failure cannot undo committed data. No events are globally suppressed.
+
+`manage.py topology_repair --plan PATH --dry-run [--json]` performs read-only D2e.1
+preflight (not final-state simulation). Application requires `--apply` instead of
+`--dry-run` plus `--confirm-workspace UUID` matching the plan. Stale/blocked/failed
+requests exit non-zero. Immutable results include reviewer/reason, ordered operations,
+created Range ID, before/after tokens, completion time, final D2a/C1 state and warnings.
+Archive the reviewed plan and JSON result externally; no DB audit model is added.
+Unexpected execution errors report unknown commit state rather than falsely claiming
+rollback; output/archive errors after success likewise require operational review.
+
+Every successful repair deliberately advances Workspace.updated_at so replay of
+the same plan is stale, including logical no-ops. NULL mode classification remains
+explicit/manual. Owner Agency deactivation remains blocked with
+owner_agency_lifecycle_unresolved. No role conversion, successor selection, owner
+transfer, user creation, onboarding, prepared zero-to-one restoration, or schema
+migration is introduced. Optional inactive-history cleanup is not required for D2a
+validity. D2f concurrent-connection verification remains deferred.
