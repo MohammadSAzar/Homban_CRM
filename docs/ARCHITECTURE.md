@@ -424,3 +424,37 @@ owner_agency_lifecycle_unresolved. No role conversion, successor selection, owne
 transfer, user creation, onboarding, prepared zero-to-one restoration, or schema
 migration is introduced. Optional inactive-history cleanup is not required for D2a
 validity. D2f concurrent-connection verification remains deferred.
+
+
+### Phase D2f — Concurrency verification and Phase D software closure
+Real independent MySQL connections now exercise overlapping Workspace-lock
+attempts with event synchronization and bounded waits (no timing-only race tests).
+Verified cases cover single-to-multi expansion, multi-team additions, manager and
+Agency replacement, prepared activation, both orderings of public User deactivation
+versus Range replacement, both orderings of repair versus customer structural writes,
+and identical repair-plan replay for bootstrap and Agency activation. Permitted
+sequential operations may both commit; conflicting transitions fail safely. Repair
+replay has exactly one winner, and Matching publication belongs only to committed
+work. Final D2a validity and C1 authority are checked. No deadlock or lock timeout
+was observed; database errors fail the tests rather than count as acceptable losers.
+
+The scoped writer audit confirms Workspace-first serialization for customer User
+activity and Range structural services, D2b/D2c/D2c.1, and D2e.2/its command. D2b
+locks local Users by PK before Ranges; repair uses explicit local IDs, excluding
+foreign legacy managers. Existing neutral management paths retain their subordinate
+ordering behind the same Workspace lock and never dispatch transitions after those
+locks. Workspace creation is a trusted provisioning primitive, not a customer
+repair/activation endpoint. Direct ORM/manual SQL bypasses are unsupported for
+runtime topology mutation; relevant admin modules register no topology writers.
+
+Phase D software architecture is complete, subject to finalization of this
+verification change: authority, validation, supported mutation enforcement, explicit
+transitions, inventory, reviewed plans and atomic repair are implemented and tested.
+This does not certify deployment data: production inventory/classification and
+reviewed repair execution remain a separate operational rollout. Workspace-mode
+NOT NULL and other DB tightening remain deferred until that rollout. Owner Agency
+lifecycle remains safely blocked/deferred; no owner transfer is inferred. Full
+onboarding/provisioning is deferred. No production behavior, model, migration, or
+customer API changes are introduced by D2f. Phase E capability work is next and
+has not started. Concurrency guarantees cover cooperating Workspace-locked writers,
+not arbitrary SQL or a substitute for production monitoring.
