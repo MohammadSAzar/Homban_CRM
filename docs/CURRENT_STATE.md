@@ -1287,3 +1287,27 @@ onboarding/provisioning is deferred. No production behavior, model, migration, o
 customer API changes are introduced by D2f. Phase E capability work is next and
 has not started. Concurrency guarantees cover cooperating Workspace-locked writers,
 not arbitrary SQL or a substitute for production monitoring.
+
+
+### Phase E1 — Read-only capability policy foundation
+`organizations.capabilities.resolve_workspace_capability(workspace, capability)`
+returns a frozen result with allowed, capability, persisted workspace_mode,
+capability_class and a stable reason. One read query checks product-mode eligibility
+only, with no cache, writes, C1 authority resolution or D2a topology validation.
+Core IDs are property_files, customers, own_matching, matching_profile, manual_tasks,
+calendar, notifications and geography. Team-only IDs are chat, announcements,
+general_group, collaboration, cross_consultant_matching and cross_consultant_pass.
+Topology-dependent Team IDs are user_management, range_management,
+workspace_administration, global_reporting, map_territory_assignment and
+custom_admin_permissions.
+
+Core is eligible in Personal/Team; the other classes require Team. NULL/missing
+Workspace mode fails closed (workspace_mode_unresolved); unknown IDs return
+unknown_capability with no class. Personal denial uses
+capability_not_available_in_personal. Eligible topology-dependent Team results use
+mode_eligible, not a claim of valid topology or actor authority; other eligibility
+uses allowed. Purchaser metadata and owner/staff/superuser identity are ignored.
+Authentication, Workspace activity/isolation, authority, topology and privacy remain
+separate checks. E1 is foundation only: no consumers or permissions are migrated,
+Chat/Collaboration/Matching/Daily Tasks behavior is unchanged, and Phase F behavior
+changes have not started. No model or migration changes are introduced.
