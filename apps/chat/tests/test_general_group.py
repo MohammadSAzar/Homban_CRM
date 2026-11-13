@@ -11,6 +11,7 @@ from django.utils import timezone
 from rest_framework.exceptions import ValidationError as APIValidationError
 
 from apps.accounts.models import User
+from apps.organizations.models import Workspace
 from apps.chat.general_group_services import set_general_group_enabled, send_general_group_message
 from apps.chat.models import GeneralGroupSettings, GeneralGroupMessage, _CHAT_WRITE
 from apps.chat.tests.fixtures import authority_people as people, people as base_people, single_team
@@ -97,13 +98,13 @@ def test_dynamic_authority_transition_keeps_participation(people):
     assert api.get(URL).data['count'] == 1
 
 
-@pytest.mark.parametrize('state', ['personal', 'inactive', 'workspace', 'internal'])
+@pytest.mark.parametrize('state', ['personal', 'null', 'inactive', 'workspace', 'internal'])
 def test_all_surfaces_fail_closed_current_state(people, state):
     enable(people)
     message = send_general_group_message(actor=people.owner, text='محفوظ')
     actor = people.owner
-    if state == 'personal':
-        User.objects.filter(pk=people.manager.pk).update(is_active=False)
+    if state in ('personal', 'null'):
+        Workspace.objects.filter(pk=people.workspace.pk).update(workspace_mode='personal' if state == 'personal' else None)
     elif state == 'inactive':
         User.objects.filter(pk=actor.pk).update(is_active=False)
     elif state == 'workspace':
@@ -119,8 +120,8 @@ def test_all_surfaces_fail_closed_current_state(people, state):
     assert api.patch(SETTINGS, {'is_enabled': False}, format='json').status_code == 403
     assert GeneralGroupMessage.objects.filter(pk=message.pk).exists()
     assert GeneralGroupSettings.objects.get().is_enabled
-    if state == 'personal':
-        people.user('new-range', role='range_manager')
+    if state in ('personal', 'null'):
+        Workspace.objects.filter(pk=people.workspace.pk).update(workspace_mode='team')
         assert api.get(URL).data['count'] == 1
 
 

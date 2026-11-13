@@ -3,6 +3,7 @@ from asgiref.sync import async_to_sync, sync_to_async
 from django.core.files.uploadedfile import SimpleUploadedFile
 
 from apps.accounts.models import User
+from apps.organizations.models import Workspace
 from apps.chat import announcement_realtime, realtime
 from apps.chat.announcement_services import delegate_publisher, publish_announcement
 from apps.chat.models import Announcement, AnnouncementPublisher, Conversation, Message
@@ -19,6 +20,37 @@ from apps.tasks.tests.conftest import people
 pytestmark = pytest.mark.django_db(transaction=True)
 ANNOUNCEMENTS = '/api/v1/chat/announcements/'
 PUBLISHERS = '/api/v1/chat/announcement-publishers/'
+
+
+@pytest.mark.parametrize('role', ['agency_manager', 'range_manager'])
+@pytest.mark.parametrize('mode', ['personal', None])
+def test_active_manager_does_not_grant_capability(people, role, mode):
+    people.user('manager', role=role)
+    Workspace.objects.filter(pk=people.workspace.pk).update(workspace_mode=mode)
+    assert client(people.owner).get(URL).status_code == 403
+
+
+def test_team_private_chat_needs_no_manager_or_valid_topology(people):
+    Workspace.objects.filter(pk=people.workspace.pk).update(workspace_mode='team')
+    row, _ = open_conversation(actor=people.owner, participant_id=people.other.pk)
+    send_message(actor=people.owner, pk=row.pk, text='available')
+    assert client(people.owner).get(URL).status_code == 200
+    token = realtime.create_ticket(actor=people.owner, pk=row.pk)
+    assert realtime.can_connect(realtime.parse_ticket(token, row.pk))
+    assert client(people.owner).post(ANNOUNCEMENTS, {'text': 'denied'}).status_code == 403
+    assert client(people.owner).patch('/api/v1/chat/general-group/settings/',
+                                      {'is_enabled': True}, format='json').status_code == 403
+
+
+@pytest.mark.parametrize('mode', ['personal', None])
+def test_voice_history_retained_but_inaccessible(people, private_storage, mode):
+    from apps.chat.tests.test_voice import voice
+    Workspace.objects.filter(pk=people.workspace.pk).update(workspace_mode='team')
+    row, _ = open_conversation(actor=people.owner, participant_id=people.other.pk)
+    message = send_message(actor=people.owner, pk=row.pk, attachment=voice())
+    Workspace.objects.filter(pk=people.workspace.pk).update(workspace_mode=mode)
+    assert client(people.owner).get(f'/api/v1/chat/messages/{message.pk}/attachment/').status_code == 403
+    assert Message.objects.filter(pk=message.pk).exists()
 
 
 @pytest.fixture
@@ -39,9 +71,10 @@ def history(people, private_storage):
     'attachment', 'announcements', 'publish', 'announcement_ticket',
     'publishers', 'delegate', 'revoke',
 ])
-def test_personal_denies_all_surfaces_preserves_history(people, history, action):
+@pytest.mark.parametrize('mode', ['personal', None])
+def test_personal_denies_all_surfaces_preserves_history(people, history, action, mode):
     manager, row, message, announcement, delegation = history
-    User.objects.filter(pk=manager.pk).update(is_active=False)
+    Workspace.objects.filter(pk=people.workspace.pk).update(workspace_mode=mode)
     User.objects.filter(pk=people.owner.pk).update(is_staff=True, is_superuser=True, is_workspace_owner=True)
     people.owner.refresh_from_db()
     api = client(people.owner)
@@ -121,18 +154,18 @@ def test_authority_transitions_and_retained_delegation(people, transition):
 
 def test_personal_to_team_restores_history_and_ignores_customer_type(people, history):
     manager, row, *_ = history
-    User.objects.filter(pk=manager.pk).update(role='consultant')
+    Workspace.objects.filter(pk=people.workspace.pk).update(workspace_mode='personal')
     assert client(people.owner).get(URL).status_code == 403
     people.workspace.customer_type = 'consultant'
     people.workspace.save()
-    people.user('new-manager', role='range_manager')
+    Workspace.objects.filter(pk=people.workspace.pk).update(workspace_mode='team')
     response = client(people.owner).get(URL)
     assert response.status_code == 200 and response.data['results'][0]['id'] == str(row.pk)
     assert client(people.owner).get(ANNOUNCEMENTS).data['count'] == 1
 
 
 @pytest.mark.parametrize('stream', ['private', 'announcement'])
-@pytest.mark.parametrize('change', ['inactive', 'moved', 'role'])
+@pytest.mark.parametrize('change', ['personal', None])
 def test_realtime_topology_revocation_connect_delivery_and_send(people, history, app, stream, change):
     manager, row, message, announcement, _ = history
     module = realtime if stream == 'private' else announcement_realtime
@@ -142,9 +175,7 @@ def test_realtime_topology_revocation_connect_delivery_and_send(people, history,
     async def run():
         async with context() as (ws, accepted):
             assert accepted['type'] == 'websocket.accept'
-            changes = {'is_active': False} if change == 'inactive' else (
-                {'workspace': people.foreign_workspace} if change == 'moved' else {'role': 'consultant'})
-            await sync_to_async(lambda: User.objects.filter(pk=manager.pk).update(**changes))()
+            await sync_to_async(lambda: Workspace.objects.filter(pk=people.workspace.pk).update(workspace_mode=change))()
             assert not await sync_to_async(module.can_connect)(claims)
             if stream == 'private':
                 await sync_to_async(realtime.publish_message)(row.pk, message.pk)

@@ -3,6 +3,8 @@ import pytest
 
 @pytest.fixture
 def people(personal_people):
+    from apps.organizations.models import Workspace
+    Workspace.objects.filter(pk__in=(personal_people.workspace.pk, personal_people.foreign_workspace.pk)).update(workspace_mode='team')
     personal_people.manager = personal_people.user('manager', role='agency_manager')
     personal_people.user('team-fixture-manager', role='agency_manager', ws=personal_people.foreign_workspace)
     return personal_people

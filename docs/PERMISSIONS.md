@@ -31,7 +31,7 @@ C4 removes owner-based broad Range and roster reads; owner lifecycle protection 
 
 ## CURRENT IMPLEMENTED PERMISSIONS
 Domain sections below describe current behavior unless explicitly marked future. Chat
-has its manager-presence compatibility gate; Collaboration and cross-consultant Matching
+uses the central Team-only Chat capability; Collaboration and cross-consultant Matching
 do not yet use a central Team capability. NULL mode does not deny authentication.
 
 Current general authorization layers (domain-specific policies apply):
@@ -545,19 +545,17 @@ realtime while still receiving no self-Notification. Delivery is after commit an
 REST history and Notification Center remain independent recovery sources. No replay or receipts.
 
 
-### Chat Team-only compatibility policy (Phase 4A.2)
+### Chat Team-only capability policy (Phase E2)
 
-Current implementation only: "Team-capable" here means active manager presence,
-not workspace_mode=team or verified Range topology. Personal/Team capability migration
-will replace this heuristic later; setting workspace_mode currently changes no Chat access.
+Chat availability uses the central `resolve_workspace_capability(workspace, "chat")`
+policy. Team is product-eligible without requiring manager presence. Personal and NULL
+mode deny every Chat surface: private history, sends, read actions, attachments/voice,
+announcement history/publishing/delegation, General Group settings/history/send, and
+all Chat realtime tickets, socket connections and deliveries. Actor/Workspace activity
+and existing participant checks still apply. Historical records and Notifications remain
+stored; access can resume when the Workspace is Team.
 
-Chat requires an active Workspace with at least one active Agency Manager or Range
-Manager. Without either role, every Chat surface is denied: private history, sends,
-read actions, attachments/voice, announcement history/publishing/delegation, all Chat
-realtime tickets, socket connections and deliveries. Historical records and Notifications
-are retained; normal access can resume when the Workspace becomes Team-capable.
-
-C2 separates this compatibility availability check from Workspace authority. The Chat
+C1 authority remains separate from capability eligibility. The Chat
 policy now consumes `organizations.authority.resolve_workspace_authority` inside the
 existing Workspace-first service boundary. A valid single-team Workspace resolves only
 its Range.manager, even with Agency Managers present. Valid multi-team resolves exactly
@@ -567,11 +565,11 @@ staff or superuser fallback exists. Explicit eligible publisher delegation still
 publishing only, including retained delegation while canonical authority is unavailable;
 it never grants delegation administration or General Group settings access.
 
-Ordinary private/announcement/group reads, sends and realtime retain the manager-presence
-availability rule until Phase E. Thus ordinary Chat may be available without canonical
-management authority. Every existing current-state recheck remains; no ticket/protocol
-change or participant privacy bypass is introduced. No capability layer or structural
-topology enforcement is added.
+Ordinary Chat may be available in Team without canonical management authority.
+Retained delegation permits publishing only while Chat capability is allowed.
+Every current-state recheck remains; no ticket/protocol change or participant privacy
+bypass is introduced. Chat is the first capability consumer; no other feature consumer
+is migrated in E2. No schema change is required.
 
 Delegation remains limited to active same-Workspace Range Managers/Secretaries and is not
 needed for current authorities. Existing delegation rows are preserved until explicit

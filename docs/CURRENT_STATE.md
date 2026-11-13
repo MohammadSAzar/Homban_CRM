@@ -28,8 +28,7 @@ and WebSocket text sending, secure image/file and Ogg/Opus voice attachments, An
 with realtime, and General Group with realtime/text sending. These are backend capabilities;
 this does not claim a completed frontend or production deployment.
 
-Current authorization remains transitional: Chat uses active manager presence, not
-workspace_mode; Collaboration and cross-consultant Matching are not centrally Team-gated.
+Current authorization remains transitional: Chat is centrally Team-only via capability; Collaboration and cross-consultant Matching are not centrally Team-gated.
 Remaining Workspace Authority consumer migration, legacy Team topology repair, central
 capabilities and final mode NOT NULL enforcement remain future work. C3 removes Location owner administration; C4 removes owner-based Range/roster visibility.
 
@@ -937,19 +936,17 @@ No announcement socket writes, read-state mutation, replay/outbox/backfill, rece
 or frontend. No migrations/dependencies or private Conversation consumer changes.
 
 
-### Chat Team-only compatibility policy (Phase 4A.2)
+### Chat Team-only capability policy (Phase E2)
 
-Current implementation only: "Team-capable" here means active manager presence,
-not workspace_mode=team or verified Range topology. Personal/Team capability migration
-will replace this heuristic later; setting workspace_mode currently changes no Chat access.
+Chat availability uses the central `resolve_workspace_capability(workspace, "chat")`
+policy. Team is product-eligible without requiring manager presence. Personal and NULL
+mode deny every Chat surface: private history, sends, read actions, attachments/voice,
+announcement history/publishing/delegation, General Group settings/history/send, and
+all Chat realtime tickets, socket connections and deliveries. Actor/Workspace activity
+and existing participant checks still apply. Historical records and Notifications remain
+stored; access can resume when the Workspace is Team.
 
-Chat requires an active Workspace with at least one active Agency Manager or Range
-Manager. Without either role, every Chat surface is denied: private history, sends,
-read actions, attachments/voice, announcement history/publishing/delegation, all Chat
-realtime tickets, socket connections and deliveries. Historical records and Notifications
-are retained; normal access can resume when the Workspace becomes Team-capable.
-
-C2 separates this compatibility availability check from Workspace authority. The Chat
+C1 authority remains separate from capability eligibility. The Chat
 policy now consumes `organizations.authority.resolve_workspace_authority` inside the
 existing Workspace-first service boundary. A valid single-team Workspace resolves only
 its Range.manager, even with Agency Managers present. Valid multi-team resolves exactly
@@ -959,11 +956,11 @@ staff or superuser fallback exists. Explicit eligible publisher delegation still
 publishing only, including retained delegation while canonical authority is unavailable;
 it never grants delegation administration or General Group settings access.
 
-Ordinary private/announcement/group reads, sends and realtime retain the manager-presence
-availability rule until Phase E. Thus ordinary Chat may be available without canonical
-management authority. Every existing current-state recheck remains; no ticket/protocol
-change or participant privacy bypass is introduced. No capability layer or structural
-topology enforcement is added.
+Ordinary Chat may be available in Team without canonical management authority.
+Retained delegation permits publishing only while Chat capability is allowed.
+Every current-state recheck remains; no ticket/protocol change or participant privacy
+bypass is introduced. Chat is the first capability consumer; no other feature consumer
+is migrated in E2. No schema change is required.
 
 Delegation remains limited to active same-Workspace Range Managers/Secretaries and is not
 needed for current authorities. Existing delegation rows are preserved until explicit
@@ -1308,6 +1305,6 @@ capability_not_available_in_personal. Eligible topology-dependent Team results u
 mode_eligible, not a claim of valid topology or actor authority; other eligibility
 uses allowed. Purchaser metadata and owner/staff/superuser identity are ignored.
 Authentication, Workspace activity/isolation, authority, topology and privacy remain
-separate checks. E1 is foundation only: no consumers or permissions are migrated,
-Chat/Collaboration/Matching/Daily Tasks behavior is unchanged, and Phase F behavior
-changes have not started. No model or migration changes are introduced.
+separate checks. E1 introduced the foundation without migrating consumers. E2 now
+migrates Chat only; Collaboration/Matching/Daily Tasks behavior remains unchanged.
+Phase F behavior changes have not started. No model or migration changes are introduced.

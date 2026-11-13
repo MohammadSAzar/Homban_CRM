@@ -51,7 +51,7 @@ def test_canonical_authority_and_non_authority_roles(topology, multi):
 
 @pytest.mark.parametrize('state', ['personal', 'null', 'zero', 'missing', 'inactive_manager',
                                  'wrong_role', 'foreign_manager', 'multiple_agency', 'no_agency'])
-def test_invalid_authority_does_not_replace_compatibility_availability(topology, state):
+def test_capability_and_authority_are_separate(topology, state):
     people, manager, team, agency = topology
     set_general_group_enabled(actor=manager, is_enabled=True)
     if state in ('personal', 'null'):
@@ -79,12 +79,12 @@ def test_invalid_authority_does_not_replace_compatibility_availability(topology,
         actor.save()
         actions(actor, delegate, False)
     api = client(people.owner)
-    assert api.get(A).status_code == 200
-    assert api.get(URL).status_code == 200
-    assert api.get(G).status_code == 200
-    assert api.post(G, {'text': 'عضو'}).status_code == 201
-    assert api.post(A + 'realtime-ticket/', {}, format='json').status_code == 200
-    assert api.post(G + 'realtime-ticket/', {}, format='json').status_code == 200
+    assert api.get(A).status_code == (403 if state in ('personal', 'null') else 200)
+    assert api.get(URL).status_code == (403 if state in ('personal', 'null') else 200)
+    assert api.get(G).status_code == (403 if state in ('personal', 'null') else 200)
+    assert api.post(G, {'text': 'عضو'}).status_code == (403 if state in ('personal', 'null') else 201)
+    assert api.post(A + 'realtime-ticket/', {}, format='json').status_code == (403 if state in ('personal', 'null') else 200)
+    assert api.post(G + 'realtime-ticket/', {}, format='json').status_code == (403 if state in ('personal', 'null') else 200)
 
 
 @pytest.mark.parametrize('change', ['none', 'personal', 'null', 'inactive', 'moved', 'role'])
@@ -103,7 +103,7 @@ def test_retained_delegation_only_grants_publishing(topology, change):
         User.objects.filter(pk=delegate.pk).update(role='consultant')
     delegate.refresh_from_db()
     api = client(delegate)
-    assert api.post(A, {'text': 'تفویض'}).status_code == (201 if change in ('none', 'personal', 'null') else 403)
+    assert api.post(A, {'text': 'تفویض'}).status_code == (201 if change == 'none' else 403)
     assert api.get(P).status_code == 403
     assert api.delete(f'{P}{row.pk}/').status_code == 403
     assert api.patch(G + 'settings/', {'is_enabled': True}, format='json').status_code == 403

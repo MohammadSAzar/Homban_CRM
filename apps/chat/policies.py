@@ -5,14 +5,13 @@ from rest_framework.exceptions import PermissionDenied
 from apps.accounts.authentication import customer_can_authenticate
 from apps.accounts.models import User
 from apps.organizations.authority import resolve_workspace_authority
+from apps.organizations.capabilities import resolve_workspace_capability
+from apps.organizations.models import Workspace
 
 
 def chat_is_available(workspace_id):
-    """Temporary manager-presence availability, independent of canonical authority."""
-    return bool(workspace_id) and User.objects.filter(
-        workspace_id=workspace_id, workspace__is_active=True, is_active=True,
-        role__in=(User.Role.AGENCY_MANAGER, User.Role.RANGE_MANAGER),
-    ).exists()
+    """Product entitlement only; actor/Workspace activity is checked separately."""
+    return bool(workspace_id) and resolve_workspace_capability(Workspace(pk=workspace_id), "chat").allowed
 
 
 def require_chat_access(actor):

@@ -112,7 +112,7 @@ must retain access checks and use their Workspace-locked transaction when needed
 Keep tenant isolation, purchaser metadata, product mode and operational authority separate.
 Personal is one consultant with Core capabilities. Team-only and topology-dependent
 features are classified in PRODUCT; the read-only E1 foundation is described below,
-while consumer enforcement remains deferred.
+with Chat consumer enforcement added in E2 and other consumers still deferred.
 Target Team has one or more Ranges: single-team authority is the Range Manager;
 multi-team authority is an Agency Manager above managed teams. Current schema permits
 legacy states and does not enforce these invariants.
@@ -120,10 +120,13 @@ legacy states and does not enforce these invariants.
 C2 migrates Chat announcement default publishing, delegation administration and General
 Group settings to the C1 resolver. Personal/NULL/invalid Team have no Workspace Chat
 Authority; valid single-team uses its Range Manager, valid multi-team its unique Agency
-Manager. Explicit eligible delegation remains publishing-only. Chat ordinary availability
-still uses a separate temporary manager-presence check, not workspace_mode gating.
-Private participant privacy, ordinary read/send/realtime eligibility and protocols remain
-unchanged. No capability layer or structural topology enforcement is added.
+Manager. Explicit eligible delegation remains publishing-only. E2 Chat availability
+uses the central `resolve_workspace_capability(workspace, "chat")` policy: Team is
+eligible without manager presence; Personal/NULL deny all Chat HTTP, media and realtime
+surfaces while retaining history. C1 authority, delegation, participant privacy and
+actor/Workspace activity checks remain separate. Ticket/socket protocols are unchanged.
+Chat is the first capability consumer; no other feature consumer is migrated in E2.
+No model or migration change is required.
 Other domains retain role/scope rules and some owner privileges. Target owner identity
 never grants operational authority; future authority cannot override private object
 boundaries documented in PERMISSIONS.
@@ -480,6 +483,6 @@ capability_not_available_in_personal. Eligible topology-dependent Team results u
 mode_eligible, not a claim of valid topology or actor authority; other eligibility
 uses allowed. Purchaser metadata and owner/staff/superuser identity are ignored.
 Authentication, Workspace activity/isolation, authority, topology and privacy remain
-separate checks. E1 is foundation only: no consumers or permissions are migrated,
-Chat/Collaboration/Matching/Daily Tasks behavior is unchanged, and Phase F behavior
-changes have not started. No model or migration changes are introduced.
+separate checks. E1 introduced the foundation without migrating consumers. E2 now
+migrates Chat only; Collaboration/Matching/Daily Tasks behavior remains unchanged.
+Phase F behavior changes have not started. No model or migration changes are introduced.

@@ -69,14 +69,14 @@ def test_ticket_all_roles_strict_safe_and_connect(setup, role):
     assert not GeneralGroupMessage.objects.exists() and not Notification.objects.exists()
 
 
-@pytest.mark.parametrize('state', ['disabled', 'personal', 'inactive', 'moved', 'workspace', 'role'])
+@pytest.mark.parametrize('state', ['disabled', 'personal', 'null', 'inactive', 'moved', 'workspace', 'role'])
 def test_current_state_revocation_for_ticket_connect_send_delivery(setup, state):
     people, app = setup
     token = rt.create_ticket(actor=people.owner)
     message = send_general_group_message(actor=people.other, text='محفوظ')
     def revoke():
         if state == 'disabled': set_general_group_enabled(actor=people.manager, is_enabled=False)
-        elif state == 'personal': User.objects.filter(pk=people.manager.pk).update(is_active=False)
+        elif state in ('personal', 'null'): Workspace.objects.filter(pk=people.workspace.pk).update(workspace_mode='personal' if state == 'personal' else None)
         elif state == 'inactive': User.objects.filter(pk=people.owner.pk).update(is_active=False)
         elif state == 'moved': User.objects.filter(pk=people.owner.pk).update(workspace=people.foreign_workspace)
         elif state == 'workspace': Workspace.objects.filter(pk=people.workspace.pk).update(is_active=False)
@@ -95,9 +95,9 @@ def test_current_state_revocation_for_ticket_connect_send_delivery(setup, state)
     async_to_sync(run)()
     assert client(people.owner).post(URL + 'realtime-ticket/', {}, format='json').status_code == 403
     assert GeneralGroupMessage.objects.count() == 1 and not Notification.objects.exists()
-    if state in ('disabled', 'personal'):
+    if state in ('disabled', 'personal', 'null'):
         if state == 'disabled': set_general_group_enabled(actor=people.manager, is_enabled=True)
-        else: people.user('restored-manager', role='range_manager')
+        else: Workspace.objects.filter(pk=people.workspace.pk).update(workspace_mode='team')
         fresh = rt.create_ticket(actor=people.owner)
         async def reconnect():
             async with socket(app, fresh) as (_, accepted):
