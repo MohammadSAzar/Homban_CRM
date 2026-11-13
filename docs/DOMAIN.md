@@ -1342,7 +1342,7 @@ revocation. Authority never grants access to another user's private conversation
 `customer_type`, workspace ownership, staff and superuser flags grant no Chat authority.
 No schema, dependency, ticket/protocol or notification/read lifecycle change is introduced.
 Chat (E2), Collaboration (E3) and cross-consultant Matching (E4) use central Team-only
-capabilities. Own Matching remains Core; Daily Tasks itself remains unmigrated.
+capabilities. Own Matching remains Core; Daily Tasks is Core and composes capability-filtered source projections (E5).
 
 
 ### Internal Chat Phase 4B — General Group Foundation

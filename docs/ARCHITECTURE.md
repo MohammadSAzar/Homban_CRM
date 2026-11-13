@@ -484,7 +484,7 @@ mode_eligible, not a claim of valid topology or actor authority; other eligibili
 uses allowed. Purchaser metadata and owner/staff/superuser identity are ignored.
 Authentication, Workspace activity/isolation, authority, topology and privacy remain
 separate checks. E1 introduced the foundation without migrating consumers. E2 now
-migrated Chat; E3 now migrates Collaboration. E4 migrates cross-consultant Matching; Daily Tasks itself remains unmigrated.
+migrated Chat; E3 now migrates Collaboration. E4 migrates cross-consultant Matching; Daily Tasks is Core and composes capability-filtered source projections (E5).
 Phase F behavior changes have not started. No model or migration changes are introduced.
 
 
@@ -497,7 +497,7 @@ stored and becomes accessible again only when capability and existing participan
 allow it. Owner/staff/superuser and purchaser metadata confer no entitlement.
 Participant scope, tenant privacy, status transitions, duplicate suppression and existing
 notification/Matching side effects are unchanged for eligible Team operations. C1 authority
-is unchanged. Chat + Collaboration + cross-consultant Matching are migrated; Daily Tasks itself remains unmigrated.
+is unchanged. Chat + Collaboration + cross-consultant Matching are migrated; Daily Tasks is Core and composes capability-filtered source projections (E5).
 No model, migration or new API is introduced.
 
 
@@ -511,5 +511,18 @@ Generation excludes unentitled new pairs and reconciles retained historical rows
 current; viewer scopes deny cross-owner history immediately while entitlement is absent.
 Allowed live cross-owner results alone can carry collaboration references; E3 redemption
 rules are unchanged. Chat + Collaboration + cross-consultant Matching are migrated;
-Daily Tasks itself is not capability-migrated and consumes the restricted recommendation
-scope. No model fields, schema, migrations or authority semantics change.
+Daily Tasks is Core and consumes capability-filtered Matching and Collaboration
+projections (E5). No model fields, schema, migrations or authority semantics change.
+
+
+### Phase E5 — Daily Tasks source capability composition
+
+Daily Tasks remains Core; no new Daily Tasks capability class or Team-only gate is added.
+Its Workspace-locked aggregation composes the authoritative recommendation viewer scope,
+Collaboration participant scope plus its central capability, and ManualTask owner scope.
+The same scoped querysets supply pagination and card hydration. Personal and NULL retain
+own Matching + ManualTask where existing rules allow, with no Collaboration/cross-consultant
+Matching cards. Team retains the existing mixed feed. Detail/actions continue to delegate
+to source services, so source capability restrictions cannot be bypassed through Daily Tasks.
+Ordering, Jalali timestamps, privacy, score isolation, read-only feed behavior and query
+bounds remain unchanged. No model/migration, source lifecycle or ManualTask behavior changes.

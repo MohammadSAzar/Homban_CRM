@@ -2,6 +2,7 @@
 from django.db import transaction
 from django.utils import timezone
 from common.jalali import today_bounds, timestamp_display
+from apps.organizations.capabilities import resolve_workspace_capability
 from apps.tasks.models import ManualTask
 from apps.tasks.services import lock_actor
 from apps.tasks.serializers import task_card
@@ -19,12 +20,20 @@ class DailyPagination(PageNumberPagination):
     page_size = 50
 
 
-def feed_index(actor, *, type, status, now=None):
-    now = now or timezone.now()
-    today, tomorrow = today_bounds(now)
+def _source_scopes(actor):
+    # Called after lock_actor: reuse these scopes for SQL pagination and hydration.
+    # Daily Tasks stays Core; only its source projections require entitlement.
     matches = MatchRecommendation.objects.for_viewer(actor)
     collaborations = CollaborationRequest.objects.for_participant(actor).with_validity()
-    manual = ManualTask.objects.for_owner(actor)
+    if not resolve_workspace_capability(actor.workspace, "collaboration").allowed:
+        collaborations = collaborations.none()
+    return matches, collaborations, ManualTask.objects.for_owner(actor)
+
+
+def feed_index(actor, sources, *, type, status, now=None):
+    now = now or timezone.now()
+    today, tomorrow = today_bounds(now)
+    matches, collaborations, manual = sources
     if actor.role != 'consultant':
         matches, collaborations = matches.none(), collaborations.none()
     valid = Q(is_viewer_valid=True, is_source_valid=True, property_file__status='active', customer__status='active')
@@ -85,16 +94,17 @@ def feed_page(*, actor, filters, request):
     actor = lock_actor(actor)
     now = timezone.now()
     pagination = DailyPagination()
-    index = feed_index(actor, type=filters['type'], status=filters['status'], now=now)
+    sources = _source_scopes(actor)
+    index = feed_index(actor, sources, type=filters['type'], status=filters['status'], now=now)
     page = pagination.paginate_queryset(index, request)
     match_ids = [item['id'] for item in page if item['_kind'] == 'match_recommendation']
     collaboration_ids = [item['id'] for item in page if item['_kind'] == 'collaboration_request']
     manual_ids = [item['id'] for item in page if item['_kind'] == 'manual_task']
-    matches = MatchRecommendation.objects.for_viewer(actor).filter(pk__in=match_ids).select_related('property_file', 'customer')
-    collaborations = CollaborationRequest.objects.for_participant(actor).filter(pk__in=collaboration_ids).with_validity().select_related('property_file', 'customer', 'requester', 'recipient')
+    matches = sources[0].filter(pk__in=match_ids).select_related('property_file', 'customer')
+    collaborations = sources[1].filter(pk__in=collaboration_ids).select_related('property_file', 'customer', 'requester', 'recipient')
     cards = {('match_recommendation', row.pk): recommendation_card(row) for row in matches}
     cards.update({('collaboration_request', row.pk): collaboration_card(row, actor) for row in collaborations})
-    cards.update({('manual_task', row.pk): task_card(row, now=now) for row in ManualTask.objects.for_owner(actor).filter(pk__in=manual_ids)})
+    cards.update({('manual_task', row.pk): task_card(row, now=now) for row in sources[2].filter(pk__in=manual_ids)})
     return pagination.get_paginated_response([cards[(item['_kind'], item['id'])] for item in page])
 
 

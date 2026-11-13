@@ -149,3 +149,46 @@ def test_manual_daily_alias_does_not_grant_other_owner_access(world):
     client=client_for(world.own)
     assert client.get(f'{FEED}manual/{row.pk}/').status_code==404
     assert client.post(f'{FEED}manual/{row.pk}/status/',{'status':'done'},format='json').status_code==404
+
+
+@pytest.mark.parametrize('mode', ['personal', None, 'team'])
+@pytest.mark.parametrize('privileged', [False, True])
+def test_source_capabilities_preserve_core_feed_and_actions(world, mode, privileged):
+    from apps.accounts.models import User
+    from apps.organizations.models import Workspace
+    from apps.matching.models import CollaborationRequest, CollaborationEvent
+    from apps.tasks.models import ManualTask
+    own = refresh_recommendation(viewer=world.own, property_file=world.own_file, customer=world.own_customer)
+    cross = refresh_recommendation(viewer=world.own, property_file=world.own_file, customer=world.other_customer)
+    collaboration = create_from_live(actor=world.other,
+        reference=issue_reference(world.other, world.own_file, world.other_customer))
+    manual = task(world.own)
+    Workspace.objects.filter(pk=world.ws.pk).update(workspace_mode=mode,
+        customer_type='agency_manager' if privileged else 'consultant')
+    User.objects.filter(pk=world.own.pk).update(is_workspace_owner=privileged,
+        is_staff=privileged, is_superuser=privileged)
+    before = [list(model.objects.values()) for model in
+              (MatchRecommendation, CollaborationRequest, CollaborationEvent, ManualTask)]
+    api = client_for(world.own)
+    with patch('django.utils.timezone.now', return_value=NOW):
+        response = api.get(FEED)
+        cards = rows(response)
+    expected = [collaboration['id'], str(manual.pk), str(own.pk), str(cross.pk)] if mode == 'team' else [str(manual.pk), str(own.pk)]
+    assert {card['id'] for card in cards} == set(expected)
+    assert cards[0]['id'] == (collaboration['id'] if mode == 'team' else str(manual.pk))
+    assert 'SECRET' not in response.content.decode()
+    assert before == [list(model.objects.values()) for model in
+                      (MatchRecommendation, CollaborationRequest, CollaborationEvent, ManualTask)]
+    own_url = f'{FEED}matching/{own.pk}/'
+    assert api.get(own_url).status_code == 200
+    assert api.post(own_url + 'status/', {'status': 'seen'}, format='json').status_code == 200
+    cross_url = f'{FEED}matching/{cross.pk}/'
+    collaboration_url = f'{FEED}collaboration/{collaboration["id"]}/'
+    assert api.get(cross_url).status_code == (200 if mode == 'team' else 404)
+    assert api.post(cross_url + 'status/', {'status': 'seen'}, format='json').status_code == (200 if mode == 'team' else 404)
+    assert api.get(collaboration_url).status_code == (200 if mode == 'team' else 403)
+    assert api.post(collaboration_url + 'status/', {'status': 'accepted'}, format='json').status_code == (200 if mode == 'team' else 403)
+    if mode != 'team':
+        for status in ('all', 'new', 'expired'):
+            assert rows(api.get(FEED, {'type': 'collaboration', 'status': status})) == []
+        assert CollaborationRequest.objects.get(pk=collaboration['id']).manual_status == 'new'
