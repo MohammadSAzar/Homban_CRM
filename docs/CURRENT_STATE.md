@@ -28,7 +28,7 @@ and WebSocket text sending, secure image/file and Ogg/Opus voice attachments, An
 with realtime, and General Group with realtime/text sending. These are backend capabilities;
 this does not claim a completed frontend or production deployment.
 
-Current authorization remains transitional: Chat and Collaboration are centrally Team-only via capabilities; Matching and Daily Tasks remain unmigrated.
+Current authorization remains transitional: Chat, Collaboration and cross-consultant Matching are centrally Team-only via capabilities; own Matching remains Core and Daily Tasks itself remains unmigrated.
 Remaining Workspace Authority consumer migration, legacy Team topology repair, central
 capabilities and final mode NOT NULL enforcement remain future work. C3 removes Location owner administration; C4 removes owner-based Range/roster visibility.
 
@@ -1306,7 +1306,7 @@ mode_eligible, not a claim of valid topology or actor authority; other eligibili
 uses allowed. Purchaser metadata and owner/staff/superuser identity are ignored.
 Authentication, Workspace activity/isolation, authority, topology and privacy remain
 separate checks. E1 introduced the foundation without migrating consumers. E2 now
-migrated Chat; E3 now migrates Collaboration. Matching/Daily Tasks remain unmigrated.
+migrated Chat; E3 now migrates Collaboration. E4 migrates cross-consultant Matching; Daily Tasks itself remains unmigrated.
 Phase F behavior changes have not started. No model or migration changes are introduced.
 
 
@@ -1319,5 +1319,19 @@ stored and becomes accessible again only when capability and existing participan
 allow it. Owner/staff/superuser and purchaser metadata confer no entitlement.
 Participant scope, tenant privacy, status transitions, duplicate suppression and existing
 notification/Matching side effects are unchanged for eligible Team operations. C1 authority
-is unchanged. Chat + Collaboration are migrated; Matching and Daily Tasks remain unmigrated.
+is unchanged. Chat + Collaboration + cross-consultant Matching are migrated; Daily Tasks itself remains unmigrated.
 No model, migration or new API is introduced.
+
+
+### Phase E4 — Cross-consultant Matching capability
+
+Matching uses `cross_consultant_matching` only for different-owner File/Customer pairs.
+Personal/NULL exclude cross-owner live and weak candidates; Team retains existing scope
+and privacy checks. Own Matching, MatchingProfile and own recommendation lifecycle remain
+Core in Personal + Team. Pure scoring/formulas and restricted serializers are unchanged.
+Generation excludes unentitled new pairs and reconciles retained historical rows as not
+current; viewer scopes deny cross-owner history immediately while entitlement is absent.
+Allowed live cross-owner results alone can carry collaboration references; E3 redemption
+rules are unchanged. Chat + Collaboration + cross-consultant Matching are migrated;
+Daily Tasks itself is not capability-migrated and consumes the restricted recommendation
+scope. No model fields, schema, migrations or authority semantics change.

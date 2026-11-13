@@ -31,8 +31,8 @@ C4 removes owner-based broad Range and roster reads; owner lifecycle protection 
 
 ## CURRENT IMPLEMENTED PERMISSIONS
 Domain sections below describe current behavior unless explicitly marked future. Chat
-and Collaboration use central Team-only capabilities; Matching and Daily Tasks
-remain unmigrated. NULL mode does not deny authentication.
+and Collaboration use central Team-only capabilities, as does cross-consultant Matching.
+Own Matching remains Core; Daily Tasks itself remains unmigrated. NULL mode does not deny authentication.
 
 Current general authorization layers (domain-specific policies apply):
 1. Authentication
@@ -741,5 +741,19 @@ stored and becomes accessible again only when capability and existing participan
 allow it. Owner/staff/superuser and purchaser metadata confer no entitlement.
 Participant scope, tenant privacy, status transitions, duplicate suppression and existing
 notification/Matching side effects are unchanged for eligible Team operations. C1 authority
-is unchanged. Chat + Collaboration are migrated; Matching and Daily Tasks remain unmigrated.
+is unchanged. Chat + Collaboration + cross-consultant Matching are migrated; Daily Tasks itself remains unmigrated.
 No model, migration or new API is introduced.
+
+
+### Phase E4 — Cross-consultant Matching capability
+
+Matching uses `cross_consultant_matching` only for different-owner File/Customer pairs.
+Personal/NULL exclude cross-owner live and weak candidates; Team retains existing scope
+and privacy checks. Own Matching, MatchingProfile and own recommendation lifecycle remain
+Core in Personal + Team. Pure scoring/formulas and restricted serializers are unchanged.
+Generation excludes unentitled new pairs and reconciles retained historical rows as not
+current; viewer scopes deny cross-owner history immediately while entitlement is absent.
+Allowed live cross-owner results alone can carry collaboration references; E3 redemption
+rules are unchanged. Chat + Collaboration + cross-consultant Matching are migrated;
+Daily Tasks itself is not capability-migrated and consumes the restricted recommendation
+scope. No model fields, schema, migrations or authority semantics change.

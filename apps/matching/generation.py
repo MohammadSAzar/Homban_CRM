@@ -8,6 +8,7 @@ from apps.organizations.models import Workspace
 from apps.properties.models import PropertyFile
 from apps.customers.models import Customer
 from .models import MatchingProfile, MatchRecommendation, RecommendationWork
+from .capability_policy import cross_consultant_allowed
 from .engine import evaluate_match
 from .recommendation_services import _apply_evaluation, _association_valid, ChangeContext
 from .services import own_profile
@@ -71,6 +72,8 @@ def _discover(work):
         customers = customers.filter(assigned_to_id=work.target_id)
     elif work.kind == "region":
         customers = customers.filter(all_regions=True)
+    if not cross_consultant_allowed(work.workspace):
+        customers = customers.filter(assigned_to_id=file.assigned_to_id)
     if work.customer_after:
         customers = customers.filter(pk__gt=work.customer_after)
     candidates = list(customers.order_by("pk").values_list("pk", "assigned_to_id")[:BATCH_SIZE + 1])
@@ -109,6 +112,7 @@ def _refresh_batch(work, identities):
     material_events = {(e["kind"], e["target_id"]): e["latest"] for e in
         RecommendationWork.objects.filter(relevant, workspace_id=work.workspace_id, material=True,
                                           pk__lte=work.pk).values("kind", "target_id").annotate(latest=Max("pk"))}
+    cross_allowed = cross_consultant_allowed(work.workspace)
     inserts, updates = [], []
     for identity in sorted(identities):
         viewer_id, file_id, customer_id = identity
@@ -124,7 +128,7 @@ def _refresh_batch(work, identities):
                 updates.append(row)
             continue
         source_valid = file.status == "active" and customer.status == "active"
-        if not _association_valid(viewer, file, customer):
+        if not _association_valid(viewer, file, customer, cross_allowed=cross_allowed):
             if row is None:
                 continue
             row.is_viewer_valid = row.is_currently_recommended = False

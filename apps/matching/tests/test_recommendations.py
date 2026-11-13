@@ -25,7 +25,7 @@ pytestmark = pytest.mark.django_db
 
 @pytest.fixture
 def pair():
-    ws = Workspace.objects.create(name="مجموعه", slug="recommendation", customer_type="consultant")
+    ws = Workspace.objects.create(name="مجموعه", slug="recommendation",workspace_mode="team", customer_type="consultant")
     viewer = User.objects.create_user(username="first", workspace=ws, role="consultant")
     other = User.objects.create_user(username="other", workspace=ws, role="consultant")
     city = City.objects.create(workspace=ws, name="شهر")

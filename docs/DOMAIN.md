@@ -1341,8 +1341,8 @@ needed for current authorities. Existing delegation rows are preserved until exp
 revocation. Authority never grants access to another user's private conversation.
 `customer_type`, workspace ownership, staff and superuser flags grant no Chat authority.
 No schema, dependency, ticket/protocol or notification/read lifecycle change is introduced.
-Chat (E2) and Collaboration (E3) use central Team-only capabilities. Cross-consultant
-Matching and Daily Tasks capability migration remains deferred.
+Chat (E2), Collaboration (E3) and cross-consultant Matching (E4) use central Team-only
+capabilities. Own Matching remains Core; Daily Tasks itself remains unmigrated.
 
 
 ### Internal Chat Phase 4B — General Group Foundation

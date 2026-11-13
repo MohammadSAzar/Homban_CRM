@@ -38,8 +38,8 @@ def endpoint(source):
 
 @pytest.fixture
 def world():
-    ws = Workspace.objects.create(name="اول",slug="live-first",customer_type="agency_manager")
-    foreign_ws = Workspace.objects.create(name="دوم",slug="live-foreign",customer_type="consultant")
+    ws = Workspace.objects.create(name="اول",slug="live-first",workspace_mode="team",customer_type="agency_manager")
+    foreign_ws = Workspace.objects.create(name="دوم",slug="live-foreign",workspace_mode="team",customer_type="consultant")
     def user(name, role="consultant", workspace=ws):
         return User.objects.create_user(username=name, role=role, workspace=workspace)
     own, other = user("own"), user("other")

@@ -24,7 +24,7 @@ pytestmark = pytest.mark.django_db
 @pytest.fixture
 def world():
     with suppress_events():
-        ws = Workspace.objects.create(name="مجموعه", slug="generation", customer_type="agency_manager")
+        ws = Workspace.objects.create(name="مجموعه", slug="generation",workspace_mode="team", customer_type="agency_manager")
         a = User.objects.create_user(username="a", workspace=ws, role="consultant")
         b = User.objects.create_user(username="b", workspace=ws, role="consultant")
         third = User.objects.create_user(username="third", workspace=ws, role="consultant")

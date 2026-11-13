@@ -20,7 +20,8 @@ class RecommendationQuerySet(models.QuerySet):
 
     def for_viewer(self, viewer):
         # Recheck live ownership even before the next reconciliation has run.
-        return self.filter(
+        from .capability_policy import entitled_recommendations
+        return entitled_recommendations(self, viewer).filter(
             viewer_id=viewer.pk, viewer__role="consultant", viewer__is_active=True,
             viewer__workspace__is_active=True,
             property_file__workspace_id=F("viewer__workspace_id"),

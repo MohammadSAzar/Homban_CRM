@@ -15,6 +15,7 @@ from apps.accounts.authentication import customer_can_authenticate
 from apps.organizations.models import Workspace
 from apps.properties.models import PropertyFile
 from apps.customers.models import Customer
+from .capability_policy import pair_entitled
 from .engine import evaluate_match
 from .models import MatchRecommendation
 from .recommendation_models import _LIFECYCLE_WRITE
@@ -52,10 +53,11 @@ def _lock_pair(viewer_id, file_id, customer_id):
     return viewer, file, customer
 
 
-def _association_valid(viewer, file, customer):
+def _association_valid(viewer, file, customer, *, cross_allowed=None):
     return bool(customer_can_authenticate(viewer) and viewer.role == User.Role.CONSULTANT
                 and viewer.workspace_id == file.workspace_id == customer.workspace_id
-                and viewer.pk in (file.assigned_to_id, customer.assigned_to_id))
+                and viewer.pk in (file.assigned_to_id, customer.assigned_to_id)
+                and pair_entitled(viewer.workspace, file, customer, cross_allowed=cross_allowed))
 
 
 def _apply_evaluation(row, result, *, source_valid, change, persist=True, reactivate=True):

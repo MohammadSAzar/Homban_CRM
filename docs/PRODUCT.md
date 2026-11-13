@@ -47,8 +47,8 @@ deferred. See [ADR 0004](decisions/0004-workspace-product-mode.md).
 | Topology-dependent Team | User/Range management, Workspace administration, global announcement administration, reporting scopes, map territory assignment, future Custom Admin permissions and Workspace Authority actions |
 
 Chat (E2) and Collaboration (E3) are centrally Team-only via capability policy:
-Personal and NULL mode are denied. Cross-consultant Matching and Daily Tasks remain
-unmigrated. Capability entitlement is separate from authority, topology and privacy;
+Personal and NULL mode are denied. Cross-consultant Matching is also centrally Team-only
+(E4); own Matching remains Core in Personal + Team. Daily Tasks itself remains unmigrated. Capability entitlement is separate from authority, topology and privacy;
 existing domain/participant checks still apply. Purchaser/owner identity grants no entitlement.
 
 ## Workspace model
@@ -241,3 +241,17 @@ Therefore:
 - Prefer selectors, toggles, sliders, drag/drop, presets
 - Keep flows obvious and forgiving
 - Hide technical complexity
+
+
+### Phase E4 — Cross-consultant Matching capability
+
+Matching uses `cross_consultant_matching` only for different-owner File/Customer pairs.
+Personal/NULL exclude cross-owner live and weak candidates; Team retains existing scope
+and privacy checks. Own Matching, MatchingProfile and own recommendation lifecycle remain
+Core in Personal + Team. Pure scoring/formulas and restricted serializers are unchanged.
+Generation excludes unentitled new pairs and reconciles retained historical rows as not
+current; viewer scopes deny cross-owner history immediately while entitlement is absent.
+Allowed live cross-owner results alone can carry collaboration references; E3 redemption
+rules are unchanged. Chat + Collaboration + cross-consultant Matching are migrated;
+Daily Tasks itself is not capability-migrated and consumes the restricted recommendation
+scope. No model fields, schema, migrations or authority semantics change.

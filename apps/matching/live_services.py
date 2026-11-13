@@ -14,6 +14,7 @@ from apps.locations.models import Region
 from apps.organizations.models import Workspace
 from apps.properties.models import PropertyFile
 from apps.properties.policies import visible_files
+from .capability_policy import cross_consultant_allowed
 from .collaboration_references import issue_reference
 from .engine import evaluate_eligibility, evaluate_match
 from .hard_constraints import has_age_requirement, hard_constraint_failure
@@ -86,6 +87,8 @@ def live_matches(*, actor, source_id, direction, data, weak_preview=False):
             customer_type="buyer" if source.transaction_type == "sale" else "tenant",
         ).prefetch_related(scoped_preferences(workspace.pk)).defer("name", "mobile", "description")
         serializer = CustomerCandidateSerializer
+    if not cross_consultant_allowed(workspace):
+        candidates = candidates.filter(assigned_to_id=source.assigned_to_id)
     candidates = list(candidates.order_by("pk")[:MAX_CANDIDATES + 1])
     if len(candidates) > MAX_CANDIDATES:
         raise ValidationError({"candidates": _("تعداد نامزدها از سقف ۱۰۰۰ رکورد این نسخه بیشتر است؛ محاسبه انجام نشد.")}, code="candidate_limit_exceeded")
