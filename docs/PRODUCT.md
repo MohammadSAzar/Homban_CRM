@@ -46,10 +46,10 @@ deferred. See [ADR 0004](decisions/0004-workspace-product-mode.md).
 | Team-only | Internal Chat, General Group, Announcements, Collaboration, cross-consultant matching/pass and cross-consultant workflows |
 | Topology-dependent Team | User/Range management, Workspace administration, global announcement administration, reporting scopes, map territory assignment, future Custom Admin permissions and Workspace Authority actions |
 
-This is the approved direction, not completed capability enforcement. Current policies
-remain domain/role-based; Collaboration and cross-consultant Matching are not centrally
-Team-gated. Chat uses the temporary manager-presence rule below. Purchaser/owner identity
-must not grant target operational authority; legacy owner privileges remain in some domains.
+Chat (E2) and Collaboration (E3) are centrally Team-only via capability policy:
+Personal and NULL mode are denied. Cross-consultant Matching and Daily Tasks remain
+unmigrated. Capability entitlement is separate from authority, topology and privacy;
+existing domain/participant checks still apply. Purchaser/owner identity grants no entitlement.
 
 ## Workspace model
 Intended Workspace provisioning provides the following; the full production provisioning
@@ -82,8 +82,8 @@ Customers:
 A file/customer is assigned to a consultant, who is responsible for it.
 
 ## Pass/collaboration concept
-In the Team target, consultants may collaborate across assigned records. The existing
-Collaboration implementation is not yet workspace_mode-gated.
+In Team, consultants may collaborate across assigned records. Collaboration now requires
+the central collaboration capability (E3), in addition to existing participant rules.
 
 Example:
 - Consultant A owns a file
@@ -162,19 +162,16 @@ Internal workspace chat:
 - Official announcement channel
 - Optional general group
 
-Chat is Team-only in the target. Current availability is a compatibility heuristic,
-not workspace_mode enforcement: an active Agency Manager or Range Manager must exist.
-Announcement publishing/delegation administration uses current Workspace Chat Authority:
-Agency Managers take precedence; otherwise Range Managers inherit it. Explicit delegation
-may allow eligible Range Managers/Secretaries to publish. This is not the planned
-repository-wide topology-based Workspace Authority resolver.
+Chat is centrally Team-only via the chat capability (E2); Personal/NULL are denied.
+Manager presence alone grants no availability. Announcement administration uses the
+separate C1 Workspace Authority resolver; eligible explicit delegation remains
+publishing-only. Existing participant privacy and activity checks still apply.
 
 General group:
 - One optional Workspace-wide group, Team-only; all active customer roles participate
   automatically when enabled. No manual membership or custom groups.
-- Current Workspace Chat Authority enables/disables it: active Agency Managers take
-  precedence; active Range Managers inherit authority only when none exist.
-- Without either active manager role, Chat is unavailable; this does not classify workspace_mode.
+- Current C1 Workspace Authority enables/disables it, independently of capability.
+- Team capability eligibility does not require manager presence; Personal/NULL deny access.
   Customer type and workspace ownership do not grant Chat authority.
 - The Phase 4B foundation is text-only REST history/sending, disabled by default;
   disabling retains history. Phase 4B.1 adds realtime delivery and WebSocket text sending

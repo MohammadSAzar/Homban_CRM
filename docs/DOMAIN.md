@@ -1328,32 +1328,21 @@ dependency, origin setting or private Conversation consumer changes are introduc
 
 ### Chat Team-only compatibility policy (Phase 4A.2)
 
-Current implementation only: "Team-capable" here means active manager presence,
-not workspace_mode=team or verified Range topology. Personal/Team capability migration
-will replace this heuristic later; setting workspace_mode currently changes no Chat access.
-
-Chat requires an active Workspace with at least one active Agency Manager or Range
-Manager. Without either role, every Chat surface is denied: private history, sends,
-read actions, attachments/voice, announcement history/publishing/delegation, all Chat
-realtime tickets, socket connections and deliveries. Historical records and Notifications
-are retained; normal access can resume when the Workspace becomes Team-capable.
-
-`apps.chat.policies` centralizes the policy at the existing Workspace-first `lock_actor`
-boundary. Current active Agency Managers are equal Workspace Chat authorities. Only when
-none exist do all active Range Managers inherit publishing and delegation administration.
-An Agency Manager appearing immediately removes Range Managers' implicit global authority;
-valid retained publisher delegation can still allow them to publish, but not administer.
-Removing/deactivating the final Agency Manager restores Range Manager authority if one
-remains. No manager means Chat is unavailable. Every request/socket recheck reads current
-DB topology; no cached ticket claim grants continued access.
+Current availability supersedes the Phase 4A.2 heuristic: E2 uses the central chat
+capability. Team is eligible without manager presence; Personal/NULL deny private,
+announcement and General Group reads/writes/media/tickets/socket access. History is retained.
+Capability entitlement is separate from C1 authority, topology and participant privacy.
+The shared Workspace-first Chat boundary retains activity and current-state checks;
+no cached ticket claim grants continued access. C1 governs administration, while
+eligible explicit delegation remains publishing-only.
 
 Delegation remains limited to active same-Workspace Range Managers/Secretaries and is not
 needed for current authorities. Existing delegation rows are preserved until explicit
 revocation. Authority never grants access to another user's private conversation.
 `customer_type`, workspace ownership, staff and superuser flags grant no Chat authority.
 No schema, dependency, ticket/protocol or notification/read lifecycle change is introduced.
-This is Chat-only compatibility, not the planned central Workspace Authority. General
-Group is implemented below; repository-wide capability/authority enforcement is deferred.
+Chat (E2) and Collaboration (E3) use central Team-only capabilities. Cross-consultant
+Matching and Daily Tasks capability migration remains deferred.
 
 
 ### Internal Chat Phase 4B — General Group Foundation
@@ -1376,11 +1365,9 @@ the message stays in its original Workspace. No phone or raw Gregorian timestamp
 
 The unchanged centralized Chat policy applies before all access. All current active customer
 roles may read settings, and read/send when enabled, regardless of Range. Only current
-Workspace Chat Authority changes settings: Agency Managers when present, otherwise Range
-Managers. Owner/staff/superuser/customer_type confer no bypass. Authority transitions are
-immediate without changing enabled state. Losing the final active manager denies all access but retains
-state/history; restoring a manager restores access if still enabled. These are
-compatibility-state transitions, not workspace_mode changes. Private Chat and
+C1 Workspace Chat Authority changes settings. Owner/staff/superuser/customer_type confer no bypass. Authority transitions are
+immediate without changing enabled state. Personal/NULL mode denies all access but retains
+state/history; Team restores eligibility if still enabled, subject to existing access checks. Private Chat and
 Announcements remain independent and unchanged.
 
 Migration chat/0005_general_group adds only these two models, Workspace uniqueness,
@@ -1404,7 +1391,7 @@ out of access logs, as for other Chat sockets.
 
 Current active customer membership, active Workspace, Team Chat availability and enabled
 General Group are checked at ticket issuance, connect, every send and every delivery.
-Disabling the group, losing the final manager, deactivation or moving Workspace revokes
+Disabling the group, losing Chat capability, deactivation or moving Workspace revokes
 access at the next check (4403); retained history/settings are unchanged. Re-enable or
 Team restoration allows a fresh ticket/reconnection, not revival of a closed socket.
 No owner/staff/superuser/customer_type bypass is introduced.
@@ -1426,7 +1413,7 @@ history provide best-effort recovery. There is no replay/outbox/backfill.
 
 No Notifications, read/unread state, receipts, membership, media, settings commands, schema
 or dependency changes. Private/announcement protocols and centralized Chat authority remain
-unchanged; mode-based capabilities and repository-wide authority enforcement remain deferred.
+unchanged; E2 now enforces the central Chat capability independently of C1 authority.
 
 ### Phase C4 — User and Range authority consumption
 Workspace-global user lists/detail, supported user creation/profile/activation and

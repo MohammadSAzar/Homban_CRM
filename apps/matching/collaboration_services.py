@@ -8,6 +8,7 @@ from rest_framework.exceptions import NotFound, PermissionDenied, ValidationErro
 from apps.accounts.models import User
 from apps.accounts.authentication import customer_can_authenticate
 from apps.organizations.models import Workspace
+from apps.organizations.capabilities import resolve_workspace_capability
 from apps.properties.models import PropertyFile
 from apps.customers.models import Customer
 from apps.locations.models import Region
@@ -26,6 +27,14 @@ def _actor(actor):
     if not customer_can_authenticate(user) or user.role != "consultant":
         raise PermissionDenied(_("درخواست همکاری فقط برای مشاور شرکت‌کننده مجاز است."))
     return user
+
+
+def _collaboration_actor(actor):
+    # _actor is also used by unmigrated Daily Tasks/Matching actions.
+    actor = _actor(actor)
+    if not resolve_workspace_capability(actor.workspace, "collaboration").allowed:
+        raise PermissionDenied(_("دسترسی به همکاری مجاز نیست."))
+    return actor
 
 
 def _pair(actor, file_id, customer_id):
@@ -63,7 +72,7 @@ def _establish(actor, file, customer, other):
 
 @transaction.atomic
 def create_from_recommendation(*, actor, recommendation_id):
-    actor = _actor(actor)
+    actor = _collaboration_actor(actor)
     row = MatchRecommendation.objects.filter(pk=recommendation_id, viewer=actor).first()
     if row is None:
         raise NotFound(_("پیشنهاد یافت نشد."))
@@ -75,7 +84,7 @@ def create_from_recommendation(*, actor, recommendation_id):
 
 @transaction.atomic
 def create_from_live(*, actor, reference):
-    actor = _actor(actor)
+    actor = _collaboration_actor(actor)
     data = verify_reference(reference, actor)
     file, customer, other = _pair(actor, data["file"], data["customer"])
     if not constant_time_compare(ownership_fingerprint(file, customer), data["ownership"]):
@@ -85,7 +94,7 @@ def create_from_live(*, actor, reference):
 
 @transaction.atomic
 def open_request(*, actor, request_id, status=None):
-    actor = _actor(actor)
+    actor = _collaboration_actor(actor)
     row = CollaborationRequest.objects.select_for_update().select_related(
         "requester__workspace", "recipient__workspace", "property_file__city", "property_file__region__city", "customer",
     ).prefetch_related(Prefetch("customer__preferred_regions", queryset=Region.objects.select_related("city"))).for_participant(actor).filter(pk=request_id).first()

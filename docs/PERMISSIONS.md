@@ -31,8 +31,8 @@ C4 removes owner-based broad Range and roster reads; owner lifecycle protection 
 
 ## CURRENT IMPLEMENTED PERMISSIONS
 Domain sections below describe current behavior unless explicitly marked future. Chat
-uses the central Team-only Chat capability; Collaboration and cross-consultant Matching
-do not yet use a central Team capability. NULL mode does not deny authentication.
+and Collaboration use central Team-only capabilities; Matching and Daily Tasks
+remain unmigrated. NULL mode does not deny authentication.
 
 Current general authorization layers (domain-specific policies apply):
 1. Authentication
@@ -730,3 +730,16 @@ single-to-multi activation remains internal; its customer contract is deferred.
 Legacy repair, complete onboarding and owner Agency lifecycle remain deferred.
 No generic repair, automatic successor/role conversion, capability gating or schema
 migration is introduced.
+
+
+### Phase E3 — Collaboration capability integration
+
+The shared Collaboration service actor boundary requires the central `collaboration`
+capability under its existing Workspace-first lock. Team is eligible; Personal and NULL
+are denied for live/saved request creation, detail and status operations. History remains
+stored and becomes accessible again only when capability and existing participant rules
+allow it. Owner/staff/superuser and purchaser metadata confer no entitlement.
+Participant scope, tenant privacy, status transitions, duplicate suppression and existing
+notification/Matching side effects are unchanged for eligible Team operations. C1 authority
+is unchanged. Chat + Collaboration are migrated; Matching and Daily Tasks remain unmigrated.
+No model, migration or new API is introduced.

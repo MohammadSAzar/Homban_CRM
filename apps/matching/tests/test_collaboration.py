@@ -19,9 +19,17 @@ from apps.matching.collaboration_models import _COLLABORATION_WRITE
 from apps.matching.collaboration_references import issue_reference, SALT
 from apps.matching.collaboration_services import create_from_live, create_from_recommendation, open_request
 from apps.matching.recommendation_services import refresh_recommendation
-from apps.matching.tests.test_live import world, client_for, endpoint
+from apps.matching.tests.test_live import world as matching_world, client_for, endpoint
 
 pytestmark = pytest.mark.django_db
+
+
+@pytest.fixture
+def world(matching_world):
+    for workspace in (matching_world.ws, matching_world.foreign_ws):
+        workspace.workspace_mode = 'team'
+        workspace.save(update_fields=['workspace_mode'])
+    return matching_world
 
 
 @pytest.fixture
@@ -423,7 +431,8 @@ def test_query_count_does_not_grow_with_preferences(pair, world):
     with CaptureQueriesContext(connection) as many:
         result = detail(pair, row)
     assert len(result['customer']['preferred_regions']) == 6
-    assert len(one) == len(many) and len(many) <= 8
+    # One bounded capability lookup, independent of the number of preferences.
+    assert len(one) == len(many) and len(many) <= 9
 
 
 def test_rendered_api_privacy_duplicate_detail_and_status(pair):
@@ -457,3 +466,58 @@ def test_forged_reference_payload_shapes_rejected(pair):
     valid = signing.loads(issue_reference(actor,file,customer),salt=SALT)
     for payload in ([], {**valid,'file':'invalid'}, {**valid,'ownership':1}, {**valid,'ownership':'short'}):
         with pytest.raises(ValidationError): verify_reference(signing.dumps(payload,salt=SALT),actor)
+
+
+@pytest.mark.parametrize('mode', ['personal', None])
+@pytest.mark.parametrize('action', ['live', 'recommendation', 'detail', 'status'])
+def test_capability_denies_all_operations_without_side_effects(pair, mode, action):
+    from apps.notifications.models import Notification
+    actor, recipient, file, customer = pair
+    row = submit(pair)
+    recommendation = refresh_recommendation(viewer=actor, property_file=file, customer=customer)
+    token = issue_reference(actor, file, customer)
+    before = (list(Request.objects.values()), list(Event.objects.values()),
+              list(Notification.objects.values()), list(MatchRecommendation.objects.values()))
+    # Even privileged participants cannot use their retained history or mutate it.
+    User.objects.filter(pk__in=[actor.pk, recipient.pk]).update(
+        is_workspace_owner=True, is_staff=True, is_superuser=True)
+    Workspace.objects.filter(pk=actor.workspace_id).update(workspace_mode=mode)
+    if action == 'live':
+        response = client_for(actor).post('/api/v1/collaboration-requests/from-live-match/',
+                                          {'reference': token}, format='json')
+    elif action == 'recommendation':
+        response = client_for(actor).post(
+            f'/api/v1/match-recommendations/{recommendation.pk}/collaboration-request/', {}, format='json')
+    elif action == 'detail':
+        response = client_for(recipient).get(row['url'])
+    else:
+        response = client_for(recipient).post(row['url'] + 'status/', {'status': 'accepted'}, format='json')
+    assert response.status_code == 403
+    assert before == (list(Request.objects.values()), list(Event.objects.values()),
+                      list(Notification.objects.values()), list(MatchRecommendation.objects.values()))
+    Workspace.objects.filter(pk=actor.workspace_id).update(workspace_mode='team')
+    assert detail(pair, row)['manual_status'] == 'new'
+
+
+@pytest.mark.parametrize('customer_type', ['consultant', 'range_manager', 'agency_manager'])
+def test_team_capability_ignores_purchaser_and_preserves_notifications(pair, customer_type):
+    from apps.notifications.models import Notification
+    Workspace.objects.filter(pk=pair[0].workspace_id).update(customer_type=customer_type)
+    row = submit(pair)
+    assert row['created']
+    assert Notification.objects.count() == 1
+    assert Notification.objects.get().recipient_id == pair[1].pk
+    assert detail(pair, row, recipient=True, status='accepted')['manual_status'] == 'accepted'
+    assert not submit(pair)['created']
+    assert Notification.objects.count() == Event.objects.count() == Request.objects.count() == 1
+
+
+@pytest.mark.parametrize('mode', ['personal', None])
+def test_collaboration_gate_does_not_gate_matching_daily_actions(world, mode):
+    row = refresh_recommendation(viewer=world.own, property_file=world.own_file,
+                                 customer=world.own_customer)
+    Workspace.objects.filter(pk=world.ws.pk).update(workspace_mode=mode)
+    api = client_for(world.own)
+    url = f'/api/v1/daily-tasks/matching/{row.pk}/'
+    assert api.get(url).status_code == 200
+    assert api.post(url + 'status/', {'status': 'seen'}, format='json').status_code == 200

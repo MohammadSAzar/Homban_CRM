@@ -484,5 +484,18 @@ mode_eligible, not a claim of valid topology or actor authority; other eligibili
 uses allowed. Purchaser metadata and owner/staff/superuser identity are ignored.
 Authentication, Workspace activity/isolation, authority, topology and privacy remain
 separate checks. E1 introduced the foundation without migrating consumers. E2 now
-migrates Chat only; Collaboration/Matching/Daily Tasks behavior remains unchanged.
+migrated Chat; E3 now migrates Collaboration. Matching/Daily Tasks remain unmigrated.
 Phase F behavior changes have not started. No model or migration changes are introduced.
+
+
+### Phase E3 — Collaboration capability integration
+
+The shared Collaboration service actor boundary requires the central `collaboration`
+capability under its existing Workspace-first lock. Team is eligible; Personal and NULL
+are denied for live/saved request creation, detail and status operations. History remains
+stored and becomes accessible again only when capability and existing participant rules
+allow it. Owner/staff/superuser and purchaser metadata confer no entitlement.
+Participant scope, tenant privacy, status transitions, duplicate suppression and existing
+notification/Matching side effects are unchanged for eligible Team operations. C1 authority
+is unchanged. Chat + Collaboration are migrated; Matching and Daily Tasks remain unmigrated.
+No model, migration or new API is introduced.

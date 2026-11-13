@@ -9,7 +9,8 @@ from apps.matching.models import MatchRecommendation
 from apps.matching.recommendation_services import refresh_recommendation, change_manual_status
 from apps.matching.collaboration_services import create_from_live, open_request
 from apps.matching.collaboration_references import issue_reference
-from apps.matching.tests.test_live import world, client_for
+from apps.matching.tests.test_collaboration import matching_world, world
+from apps.matching.tests.test_live import client_for
 
 pytestmark = pytest.mark.django_db
 FEED='/api/v1/daily-tasks/'

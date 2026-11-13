@@ -1,7 +1,8 @@
 from unittest.mock import patch
 import pytest
 from django.db import transaction
-from apps.matching.tests.test_live import world, client_for
+from apps.matching.tests.test_collaboration import matching_world, world
+from apps.matching.tests.test_live import client_for
 from apps.matching.models import MatchRecommendation, RecommendationWork
 from apps.matching.recommendation_services import refresh_recommendation, change_manual_status, open_recommendation, ChangeContext
 from apps.matching.collaboration_services import create_from_live, open_request
