@@ -297,6 +297,11 @@ def test_local_neutral_operations_survive_global_invalidity(world, state):
     else:
         User.objects.filter(pk=world.agency.pk).update(is_active=False)
     client = client_for(world.manager)
+    if state == "null":
+        assert client.get(detail(world.team)).status_code == 403
+        assert client.put(membership(world.team, world.unassigned), {}, format="json").status_code == 403
+        assert client.patch(user_path(world.consultant), {"first_name": "local"}, format="json").status_code == 403
+        return
     assert client.get(detail(world.team)).status_code == 200
     assert client.put(membership(world.team, world.unassigned), {}, format="json").status_code == 204
     assert client.patch(user_path(world.consultant), {"first_name": "جدید"}, format="json").status_code == 200

@@ -374,7 +374,7 @@ def test_services_enforce_scope_without_view(world):
         create_organizational_user(actor=world.agency, data=payload())
 
 
-@pytest.mark.parametrize("actor_name,expected_queries", [("agency", 16), ("manager", 17)])
+@pytest.mark.parametrize("actor_name,expected_queries", [("agency", 18), ("manager", 19)])
 def test_management_list_has_constant_query_count(world, actor_name, expected_queries):
     client = client_for(getattr(world, actor_name))
     with CaptureQueriesContext(connection) as initial:
@@ -385,10 +385,11 @@ def test_management_list_has_constant_query_count(world, actor_name, expected_qu
     with CaptureQueriesContext(connection) as expanded:
         response = client.get(URL)
     assert response.status_code == 200
+    # Permission and scope each recheck persisted capability; still no per-row growth.
     assert len(initial) == len(expanded) == expected_queries
 
 
-@pytest.mark.parametrize("actor_name,expected_queries", [("agency", 15), ("manager", 16)])
+@pytest.mark.parametrize("actor_name,expected_queries", [("agency", 17), ("manager", 18)])
 def test_detail_query_count_and_field_allowlist(world, actor_name, expected_queries):
     with CaptureQueriesContext(connection) as queries:
         response = client_for(getattr(world, actor_name)).get(detail(world.consultant))

@@ -413,7 +413,8 @@ def test_range_list_queries_do_not_grow_with_relations(world, actor_name):
         RangeMembership.objects.create(workspace=world.workspace, range=world.team, user=world.make())
     with CaptureQueriesContext(connection) as expanded:
         assert client.get(URL).status_code == 200
-    assert len(initial) == len(expanded) == 20
+    # Two fixed capability rechecks; independent of Range/member counts.
+    assert len(initial) == len(expanded) == 22
 
 
 @pytest.mark.parametrize("actor_name", ["agency", "manager"])
@@ -424,7 +425,7 @@ def test_detail_and_roster_query_counts(world, actor_name):
         assert client.get(detail(world.team)).status_code == 200
     with CaptureQueriesContext(connection) as roster_queries:
         assert client.get(members(world.team)).status_code == 200
-    assert len(detail_queries) == 19 and len(roster_queries) == 24
+    assert len(detail_queries) == 21 and len(roster_queries) == 27
 
 
 def test_lists_and_rosters_are_paginated(world):

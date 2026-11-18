@@ -13,9 +13,11 @@ from apps.organizations.topology_services import (
 )
 from apps.organizations import topology_transitions
 from .models import Range, RangeMembership
+from .policies import require_range_capability
 
 
 def require_range_structure_authority(actor):
+    require_range_capability(actor)
     if not has_organizational_authority(actor):
         raise PermissionDenied(_("فقط مدیر مجاز مجموعه اجازه تغییر ساختار رنج را دارد."))
 
@@ -218,6 +220,7 @@ def replace_agency_authority(*, actor, data):
 
 
 def _membership_context(actor, range_id, user_id):
+    require_range_capability(actor)
     team = _locked_range(actor, range_id)
     if not has_organizational_authority(actor):
         own = managed_range(actor, lock=True)

@@ -5,6 +5,7 @@ from rest_framework.permissions import BasePermission
 
 from apps.ranges.models import Range
 from apps.organizations.authority import resolve_workspace_authority
+from apps.organizations.capabilities import resolve_workspace_capability
 from apps.organizations.models import Workspace
 from .authentication import customer_can_authenticate
 from .models import User
@@ -32,6 +33,7 @@ def is_local_range_manager(actor):
 
 def require_user_manager(actor):
     if (not actor.is_authenticated or not customer_can_authenticate(actor)
+            or not resolve_workspace_capability(actor.workspace, "user_management").allowed
             or not (has_organizational_authority(actor) or is_local_range_manager(actor))):
         raise PermissionDenied(_("اجازه مدیریت کاربران را ندارید."))
 

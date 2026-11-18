@@ -672,8 +672,8 @@ valid multi-team authority is the unique Agency Manager. Personal, NULL and inva
 topology grant no global authority. No owner/customer_type/staff/superuser shortcut
 remains. Owner is still a protected lifecycle target, not an administrator.
 Non-authority Range Managers retain self/local consultant visibility and existing
-exactly-one-active-Range consultant creation/update/add/remove rules. NULL or invalid
-global topology does not erase valid local scope. Personal legacy managers receive
+exactly-one-active-Range consultant creation/update/add/remove rules. Invalid global Team topology does not erase valid local scope; E6 denies NULL
+product mode through the central management capability checks. Personal legacy managers receive
 no organizational administration surface. Consultants retain membership-scoped
 Range reads; owner flags confer no global Range/roster visibility.
 Self, current authority, purchaser targets and Agency Managers remain protected
@@ -721,7 +721,7 @@ PATCH remains protected. User creation cannot fill an active managerless Range;
 unassigned manager candidates and existing supported non-manager roles remain
 creatable. Profile changes, consultant membership, local Range Manager scope and
 inactive Range preparation retain their existing policies without blanket global
-D2a validation. Invalid/NULL global topology does not erase valid local scope.
+D2a validation. Invalid Team topology does not erase valid local scope; E6 denies NULL product mode.
 Owner/customer_type/staff/superuser confer no authority. Foreign/missing resources
 remain non-disclosing and internal topology codes map to Persian API validation.
 
@@ -770,3 +770,21 @@ Matching cards. Team retains the existing mixed feed. Detail/actions continue to
 to source services, so source capability restrictions cannot be bypassed through Daily Tasks.
 Ordering, Jalali timestamps, privacy, score isolation, read-only feed behavior and query
 bounds remain unchanged. No model/migration, source lifecycle or ManualTask behavior changes.
+
+
+### Phase E6 — Management capability enforcement
+
+Customer User list/detail/create/update/activity paths require `user_management`.
+Range list/detail/roster/membership and structural create/update/activity/manager-change,
+explicit expansion and Agency replacement paths require `range_management` through the
+existing customer policy/service boundaries. Personal and NULL have no Team management
+surfaces. Team product eligibility alone grants no authority: C1, local Range Manager
+scope, protected targets, D topology validation and atomic lock ordering remain unchanged.
+Neutral/local operations in invalid Team topology retain their existing scope. No
+owner/customer_type/staff/superuser capability bypass exists.
+
+No distinct customer Workspace-administration consumer exists in this scope beyond
+User/Range surfaces; `workspace_administration` remains a defined capability without a
+fabricated endpoint. Geography/Chat administrative consumers are outside E6. Trusted
+internal provisioning, topology transitions and reviewed repair retain their existing
+contracts without customer capability gates. No model/schema/migration change.

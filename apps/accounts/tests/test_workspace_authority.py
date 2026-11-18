@@ -95,6 +95,11 @@ def test_local_management_survives_invalid_global_topology(world, state):
     else:
         world.make("agency_manager")
     client = client_for(world.manager)
+    if state == "null":
+        assert client.get(detail(world.manager)).status_code == 403
+        assert client.post(URL, payload(), format="json").status_code == 403
+        assert client.delete(membership(world.team, world.consultant)).status_code == 403
+        return
     assert client.get(detail(world.manager)).status_code == 200
     assert client.get(detail(world.consultant)).status_code == 200
     assert client.get(detail(world.unrelated)).status_code == 404

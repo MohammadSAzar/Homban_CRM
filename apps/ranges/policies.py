@@ -7,14 +7,22 @@ from apps.accounts.authentication import customer_can_authenticate
 from apps.accounts.models import User
 from apps.accounts.policies import has_organizational_authority, is_local_range_manager
 from apps.locations.models import Region
+from apps.organizations.capabilities import resolve_workspace_capability
 from .models import Range, RangeMembership
 
 
 def can_read_ranges(actor):
-    return bool(actor.is_authenticated and customer_can_authenticate(actor) and (
+    return bool(actor.is_authenticated and customer_can_authenticate(actor)
+                and resolve_workspace_capability(actor.workspace, "range_management").allowed and (
         has_organizational_authority(actor) or is_local_range_manager(actor)
         or actor.role == User.Role.CONSULTANT
     ))
+
+
+def require_range_capability(actor):
+    if (not actor.is_authenticated or not customer_can_authenticate(actor)
+            or not resolve_workspace_capability(actor.workspace, "range_management").allowed):
+        raise PermissionDenied(_("اجازه مدیریت رنج‌ها را ندارید."))
 
 
 def visible_ranges(actor):

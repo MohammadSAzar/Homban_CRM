@@ -1423,8 +1423,8 @@ valid multi-team authority is the unique Agency Manager. Personal, NULL and inva
 topology grant no global authority. No owner/customer_type/staff/superuser shortcut
 remains. Owner is still a protected lifecycle target, not an administrator.
 Non-authority Range Managers retain self/local consultant visibility and existing
-exactly-one-active-Range consultant creation/update/add/remove rules. NULL or invalid
-global topology does not erase valid local scope. Personal legacy managers receive
+exactly-one-active-Range consultant creation/update/add/remove rules. Invalid global Team topology does not erase valid local scope; E6 denies NULL
+product mode through the central management capability checks. Personal legacy managers receive
 no organizational administration surface. Consultants retain membership-scoped
 Range reads; owner flags confer no global Range/roster visibility.
 Self, current authority, purchaser targets and Agency Managers remain protected
