@@ -6,7 +6,7 @@ from rest_framework.exceptions import NotFound, PermissionDenied, ValidationErro
 from apps.accounts.models import User
 from apps.organizations.models import Workspace
 from .models import City, Region
-from .policies import require_location_manager
+from .policies import require_location_manager, require_workspace_administration
 
 
 def _lock_workspace(actor):
@@ -84,6 +84,7 @@ def save_region(*, actor, data, object_id=None):
 @transaction.atomic
 def set_region_mode(*, actor, data):
     workspace = _lock_workspace(actor)
+    require_workspace_administration(workspace)
     _validate_fields(data, {"region_mode"})
     mode = data.get("region_mode")
     if mode not in Workspace.RegionMode.values:

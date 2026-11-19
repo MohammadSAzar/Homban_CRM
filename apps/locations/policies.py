@@ -4,6 +4,7 @@ from rest_framework.permissions import BasePermission, SAFE_METHODS
 
 from apps.accounts.authentication import customer_can_authenticate
 from apps.organizations.authority import resolve_workspace_authority
+from apps.organizations.capabilities import resolve_workspace_capability
 from .models import City, Region
 
 
@@ -53,3 +54,8 @@ class LocationPermission(BasePermission):
         if not actor.is_authenticated or not customer_can_authenticate(actor):
             return False
         return request.method in SAFE_METHODS or can_manage_location(actor)
+
+
+def require_workspace_administration(workspace):
+    if not resolve_workspace_capability(workspace, "workspace_administration").allowed:
+        raise PermissionDenied(LocationPermission.message)

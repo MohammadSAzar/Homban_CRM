@@ -1390,3 +1390,20 @@ F1 Chat family, F2 Collaboration, F3 cross-consultant Matching, F4 Daily Tasks,
 F5 User/Range Management, and F6 Notifications. Chat-family entitlement uses distinct
 IDs: private Chat `chat`, Announcements `announcements`, General Group `general_group`.
 These product checks remain separate from authentication, C1 authority and participant access.
+
+
+### Phase F7 - Existing administration consumers
+
+`workspace_administration`: migrated existing PATCH `/api/v1/location-settings/`
+through `set_region_mode`, under its Workspace lock and existing C1 authority.
+Personal/NULL are denied without purchaser/owner/staff/superuser bypass; Team
+eligibility does not grant authority. Read-only settings and City/Region APIs
+retain their policies; these are not map territory assignment.
+`custom_admin_permissions`: no current consumer; reserved for Custom Admin.
+`global_reporting`: no current consumer; reserved for reporting.
+`map_territory_assignment`: no current consumer; reserved for the Map feature.
+Framework `/admin/` remains internal/operator administration. Internal provisioning,
+repair and F5 User/Range paths are unchanged. This supersedes F5's no-distinct-admin-
+consumer note: F7 identifies the existing location configuration mutation.
+No endpoint, model or migration is added. F7 completes planned Phase F consumer
+migration, subject to closure review. Phase G has not started.
