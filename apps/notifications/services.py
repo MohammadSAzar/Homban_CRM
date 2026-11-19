@@ -1,4 +1,4 @@
-"""Explicit, atomic publication and recipient-only read state; no source loading on reads."""
+"""Explicit, atomic publication and recipient-only read state; source-capability-aware reads."""
 from django.db import models, transaction
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
@@ -8,6 +8,7 @@ from apps.accounts.authentication import customer_can_authenticate
 from apps.accounts.models import User
 from apps.organizations.models import Workspace
 from .models import Notification, _NOTIFICATION_WRITE
+from .capability_policy import entitled_notifications, source_allowed
 
 
 def lock_recipient(recipient, *, required=True):
@@ -37,6 +38,8 @@ def publish_notification(*, recipient, kind, event_key, title, message, action_u
         event_key=event_key, title=title, message=message, action_url=action_url,
         source_type=source_type, source_id=source_id)
     row.full_clean(validate_unique=False, validate_constraints=False)
+    if not source_allowed(recipient, kind, source_id):
+        return None, False
     existing = Notification.objects.filter(recipient=recipient, event_key=event_key).first()
     if existing is not None:
         return existing, False
@@ -44,8 +47,12 @@ def publish_notification(*, recipient, kind, event_key, title, message, action_u
     return row, True
 
 
+def visible_notifications(actor):
+    return entitled_notifications(Notification.objects.for_recipient(actor), actor)
+
+
 def owned_notification(actor, pk):
-    row = Notification.objects.for_recipient(actor).filter(pk=pk).first()
+    row = visible_notifications(actor).filter(pk=pk).first()
     if row is None:
         raise NotFound(_('اعلان یافت نشد.'))
     return row
@@ -66,6 +73,7 @@ def read_all(*, actor):
     actor = lock_recipient(actor)
     # Private bounded SQL write, no row loading; only read_at is mutable.
     # Actor is authoritatively locked in this Workspace; no self-table subquery (MySQL 1093).
-    return models.QuerySet(model=Notification).filter(
+    rows = models.QuerySet(model=Notification).filter(
         recipient_id=actor.pk, workspace_id=actor.workspace_id, read_at__isnull=True,
-    ).update(read_at=timezone.now())
+    )
+    return entitled_notifications(rows, actor).update(read_at=timezone.now())

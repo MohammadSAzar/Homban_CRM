@@ -9,6 +9,7 @@ from rest_framework.exceptions import NotFound
 from apps.accounts.models import User
 from apps.organizations.models import Workspace
 from apps.matching.models import MatchRecommendation
+from apps.matching.capability_policy import pair_entitled
 from apps.matching.live_services import live_matches
 from apps.matching.services import own_profile
 from apps.matching.recommendation_services import refresh_recommendation, open_recommendation, change_manual_status
@@ -47,8 +48,11 @@ def test_own_profile_and_recommendation_lifecycle_remain_core(world, mode):
     Workspace.objects.filter(pk=world.ws.pk).update(workspace_mode=mode)
     profile = own_profile(actor=world.own)
     assert profile.user_id == world.own.pk
+    # Own-pair eligibility must not require cross-consultant entitlement.
+    # Notification publication separately revalidates the source viewer scope (E7).
     with patch('apps.matching.capability_policy.cross_consultant_allowed', side_effect=AssertionError('own pair entitlement')):
-        row = refresh_recommendation(viewer=world.own, property_file=world.own_file, customer=world.own_customer)
+        assert pair_entitled(world.ws, world.own_file, world.own_customer)
+    row = refresh_recommendation(viewer=world.own, property_file=world.own_file, customer=world.own_customer)
     assert row.is_currently_recommended
     assert open_recommendation(actor=world.own, recommendation_id=row.pk)[0].user_status == 'seen'
     assert change_manual_status(actor=world.own, recommendation_id=row.pk, status='done').user_status == 'done'

@@ -2,9 +2,8 @@ from django.db import transaction
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from .models import Notification
 from .serializers import EmptySerializer, NotificationFilterSerializer, notification_data
-from .services import lock_recipient, owned_notification, set_read, read_all
+from .services import lock_recipient, owned_notification, set_read, read_all, visible_notifications
 
 
 def empty(data):
@@ -23,7 +22,7 @@ class NotificationListView(APIView):
         serializer = NotificationFilterSerializer(data=request.query_params.dict())
         serializer.is_valid(raise_exception=True)
         filters = serializer.validated_data
-        rows = Notification.objects.for_recipient(actor).order_by('-created_at','-id')
+        rows = visible_notifications(actor).order_by('-created_at','-id')
         if filters['status'] != 'all':
             rows = rows.filter(read_at__isnull=filters['status'] == 'unread')
         if 'kind' in filters:
@@ -66,5 +65,5 @@ class NotificationCountView(APIView):
     def get(self, request):
         empty(request.query_params.dict())
         actor = lock_recipient(request.user)
-        count = Notification.objects.for_recipient(actor).filter(read_at__isnull=True).count()
+        count = visible_notifications(actor).filter(read_at__isnull=True).count()
         return Response({'unread_count': count})

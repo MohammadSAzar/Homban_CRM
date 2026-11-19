@@ -1040,7 +1040,7 @@ Persian and contains neither requester contacts nor source details. No second ev
 is introduced. Historical events are not backfilled by GET or this schema migration.
 
 Read state is only read_at: null means unread. Explicit read/unread commands are reversible
-and same-state idempotent. Read-all updates only the locked recipient's currently unread rows
+and same-state idempotent. Read-all updates only the locked recipient's currently unread, source-entitled rows
 in one SQL UPDATE and reports affected_count. Reading a notification never marks a source
 seen, and opening a source never marks its notification read. Notifications are not inserted
 into Daily Tasks, and the two unread/action counts are intentionally independent.

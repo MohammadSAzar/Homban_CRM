@@ -11,7 +11,7 @@ from django.test.utils import CaptureQueriesContext
 from django.utils import timezone
 from rest_framework.test import APIClient
 
-from apps.tasks.tests.conftest import people
+from apps.tasks.tests.conftest import people as base_people
 from apps.matching.tests.test_live import client_for
 from apps.notifications.models import Notification, _NOTIFICATION_WRITE
 from apps.notifications.services import publish_notification, set_read, read_all
@@ -19,6 +19,14 @@ from common.jalali import schedule
 
 pytestmark = pytest.mark.django_db
 URL = '/api/v1/notifications/'
+
+
+@pytest.fixture
+def people(base_people):
+    for workspace in (base_people.workspace, base_people.foreign_workspace):
+        workspace.workspace_mode = 'team'
+        workspace.save()
+    return base_people
 
 
 def publish(user, key='event:1', **changes):
@@ -202,7 +210,8 @@ def test_bounded_queries_pagination_and_count(people):
         for n in range(51): publish(people.owner,f'event:{n+2}')
     with CaptureQueriesContext(connection) as captured:
         response=client.get(URL); first=rows(response)
-    assert len(captured)==small<=8
+    # Four bounded source-entitlement checks; no per-notification queries.
+    assert len(captured)==small<=12
     second=rows(client.get(URL,{'page':2}))
     assert response.data['count']==52 and len(first)==50 and len(second)==2
     expected=[str(pk) for pk in Notification.objects.order_by('-created_at','-pk').values_list('pk',flat=True)]

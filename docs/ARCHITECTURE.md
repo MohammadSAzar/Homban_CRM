@@ -544,3 +544,20 @@ User/Range surfaces; `workspace_administration` remains a defined capability wit
 fabricated endpoint. Geography/Chat administrative consumers are outside E6. Trusted
 internal provisioning, topology transitions and reviewed repair retain their existing
 contracts without customer capability gates. No model/schema/migration change.
+
+
+### Phase E7 — Notification source capability revalidation
+
+Notification Center remains Core in Personal and Team; existing Core notification
+access also remains available for unresolved mode. Publication and all recipient
+list/count/detail/read operations revalidate source entitlement. Collaboration uses
+`collaboration`; private Chat notifications use `chat`, and Announcement notifications
+use `announcements`.
+Matching uses `cross_consultant_matching` and its authoritative viewer scope to keep
+own recommendations accessible while excluding cross-consultant sources in Personal/NULL.
+Import/voice kinds remain Core service placeholders; there are no ManualTask or General
+Group notification producers. Historical Team-only rows are retained, hidden and excluded
+from read-all while entitlement is unavailable. Source links still enforce source services'
+authorization/privacy; notification entitlement grants no source permission or score access.
+Checks use bounded queries without hydrating private source data. No model/schema change,
+new notification producer, or duplicated source authorization is introduced.
