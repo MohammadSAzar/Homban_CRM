@@ -22,12 +22,12 @@ def can_publish(actor):
 
 def list_announcements(actor):
     # Caller retains its transaction through pagination/serialization, like private Chat.
-    actor = lock_actor(actor)
+    actor = lock_actor(actor, capability="announcements")
     return Announcement.objects.filter(workspace_id=actor.workspace_id).select_related('author').order_by('-created_at', 'pk')
 
 
 def list_publishers(actor):
-    actor = lock_actor(actor)
+    actor = lock_actor(actor, capability="announcements")
     require_workspace_chat_authority(actor)
     return AnnouncementPublisher.objects.filter(workspace_id=actor.workspace_id).select_related('user').order_by('-created_at', 'pk')
 
@@ -58,7 +58,7 @@ def _notify_announcement(row):
 
 @transaction.atomic
 def publish_announcement(*, actor, text):
-    actor = lock_actor(actor)
+    actor = lock_actor(actor, capability="announcements")
     if not can_publish(actor):
         raise PermissionDenied(_('اجازه انتشار اطلاعیه ندارید.'))
     if not isinstance(text, str) or not text.strip() or len(text.strip()) > MAX_TEXT_LENGTH:
@@ -73,7 +73,7 @@ def publish_announcement(*, actor, text):
 
 @transaction.atomic
 def delegate_publisher(*, actor, user_id):
-    actor = lock_actor(actor)
+    actor = lock_actor(actor, capability="announcements")
     require_workspace_chat_authority(actor)
     target = User.objects.select_for_update().filter(pk=user_id, workspace=actor.workspace,
         is_active=True, role__in=DELEGATED_ROLES).first()
@@ -90,7 +90,7 @@ def delegate_publisher(*, actor, user_id):
 
 @transaction.atomic
 def remove_publisher(*, actor, delegation_id):
-    actor = lock_actor(actor)
+    actor = lock_actor(actor, capability="announcements")
     require_workspace_chat_authority(actor)
     row = AnnouncementPublisher.objects.filter(pk=delegation_id, workspace=actor.workspace).first()
     if row is None:

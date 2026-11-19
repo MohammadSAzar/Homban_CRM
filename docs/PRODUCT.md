@@ -46,9 +46,9 @@ deferred. See [ADR 0004](decisions/0004-workspace-product-mode.md).
 | Team-only | Internal Chat, General Group, Announcements, Collaboration, cross-consultant matching/pass and cross-consultant workflows |
 | Topology-dependent Team | User/Range management, Workspace administration, global announcement administration, reporting scopes, map territory assignment, future Custom Admin permissions and Workspace Authority actions |
 
-Chat (E2) and Collaboration (E3) are centrally Team-only via capability policy:
+Chat (F1) and Collaboration (F2) are centrally Team-only via capability policy:
 Personal and NULL mode are denied. Cross-consultant Matching is also centrally Team-only
-(E4); own Matching remains Core in Personal + Team. Daily Tasks is Core and composes capability-filtered source projections (E5). Capability entitlement is separate from authority, topology and privacy;
+(F3); own Matching remains Core in Personal + Team. Daily Tasks is Core and composes capability-filtered source projections (F4). Capability entitlement is separate from authority, topology and privacy;
 existing domain/participant checks still apply. Purchaser/owner identity grants no entitlement.
 
 ## Workspace model
@@ -83,7 +83,7 @@ A file/customer is assigned to a consultant, who is responsible for it.
 
 ## Pass/collaboration concept
 In Team, consultants may collaborate across assigned records. Collaboration now requires
-the central collaboration capability (E3), in addition to existing participant rules.
+the central collaboration capability (F2), in addition to existing participant rules.
 
 Example:
 - Consultant A owns a file
@@ -162,7 +162,7 @@ Internal workspace chat:
 - Official announcement channel
 - Optional general group
 
-Chat is centrally Team-only via the chat capability (E2); Personal/NULL are denied.
+Chat is centrally Team-only via the chat capability (F1); Personal/NULL are denied.
 Manager presence alone grants no availability. Announcement administration uses the
 separate C1 Workspace Authority resolver; eligible explicit delegation remains
 publishing-only. Existing participant privacy and activity checks still apply.
@@ -243,7 +243,7 @@ Therefore:
 - Hide technical complexity
 
 
-### Phase E4 — Cross-consultant Matching capability
+### Phase F3 — Cross-consultant Matching capability
 
 Matching uses `cross_consultant_matching` only for different-owner File/Customer pairs.
 Personal/NULL exclude cross-owner live and weak candidates; Team retains existing scope
@@ -251,13 +251,13 @@ and privacy checks. Own Matching, MatchingProfile and own recommendation lifecyc
 Core in Personal + Team. Pure scoring/formulas and restricted serializers are unchanged.
 Generation excludes unentitled new pairs and reconciles retained historical rows as not
 current; viewer scopes deny cross-owner history immediately while entitlement is absent.
-Allowed live cross-owner results alone can carry collaboration references; E3 redemption
+Allowed live cross-owner results alone can carry collaboration references; F2 redemption
 rules are unchanged. Chat + Collaboration + cross-consultant Matching are migrated;
 Daily Tasks is Core and consumes capability-filtered Matching and Collaboration
-projections (E5). No model fields, schema, migrations or authority semantics change.
+projections (F4). No model fields, schema, migrations or authority semantics change.
 
 
-### Phase E5 — Daily Tasks source capability composition
+### Phase F4 — Daily Tasks source capability composition
 
 Daily Tasks remains Core; no new Daily Tasks capability class or Team-only gate is added.
 Its Workspace-locked aggregation composes the authoritative recommendation viewer scope,
@@ -270,7 +270,7 @@ Ordering, Jalali timestamps, privacy, score isolation, read-only feed behavior a
 bounds remain unchanged. No model/migration, source lifecycle or ManualTask behavior changes.
 
 
-### Phase E6 — Management capability enforcement
+### Phase F5 — Management capability enforcement
 
 Customer User list/detail/create/update/activity paths require `user_management`.
 Range list/detail/roster/membership and structural create/update/activity/manager-change,
@@ -283,12 +283,12 @@ owner/customer_type/staff/superuser capability bypass exists.
 
 No distinct customer Workspace-administration consumer exists in this scope beyond
 User/Range surfaces; `workspace_administration` remains a defined capability without a
-fabricated endpoint. Geography/Chat administrative consumers are outside E6. Trusted
+fabricated endpoint. Geography/Chat administrative consumers are outside F5. Trusted
 internal provisioning, topology transitions and reviewed repair retain their existing
 contracts without customer capability gates. No model/schema/migration change.
 
 
-### Phase E7 � Notification source capability revalidation
+### Phase F6 � Notification source capability revalidation
 
 Notification Center remains Core in Personal and Team; existing Core notification
 access also remains available for unresolved mode. Publication and all recipient
@@ -303,3 +303,10 @@ from read-all while entitlement is unavailable. Source links still enforce sourc
 authorization/privacy; notification entitlement grants no source permission or score access.
 Checks use bounded queries without hydrating private source data. No model/schema change,
 new notification producer, or duplicated source authorization is introduced.
+
+
+Phase E covers the completed Capability Foundation only. Phase F consumers are:
+F1 Chat family, F2 Collaboration, F3 cross-consultant Matching, F4 Daily Tasks,
+F5 User/Range Management, and F6 Notifications. Chat-family entitlement uses distinct
+IDs: private Chat `chat`, Announcements `announcements`, General Group `general_group`.
+These product checks remain separate from authentication, C1 authority and participant access.

@@ -15,13 +15,13 @@ def _is_enabled(actor):
 
 @transaction.atomic
 def general_group_state(actor):
-    actor = lock_actor(actor)
+    actor = lock_actor(actor, capability="general_group")
     return {'is_enabled': _is_enabled(actor)}
 
 
 @transaction.atomic
 def set_general_group_enabled(*, actor, is_enabled):
-    actor = lock_actor(actor)
+    actor = lock_actor(actor, capability="general_group")
     require_workspace_chat_authority(actor)
     if type(is_enabled) is not bool:
         raise ValidationError({'is_enabled': _('مقدار فعال بودن باید درست یا نادرست باشد.')})
@@ -43,7 +43,7 @@ def _require_enabled(actor):
 
 def require_general_group_access(actor):
     """Current-state boundary, called inside a Workspace-first transaction."""
-    actor = lock_actor(actor)
+    actor = lock_actor(actor, capability="general_group")
     _require_enabled(actor)
     return actor
 

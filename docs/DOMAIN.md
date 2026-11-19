@@ -1328,7 +1328,7 @@ dependency, origin setting or private Conversation consumer changes are introduc
 
 ### Chat Team-only compatibility policy (Phase 4A.2)
 
-Current availability supersedes the Phase 4A.2 heuristic: E2 uses the central chat
+Current availability supersedes the Phase 4A.2 heuristic: F1 uses the distinct Chat-family
 capability. Team is eligible without manager presence; Personal/NULL deny private,
 announcement and General Group reads/writes/media/tickets/socket access. History is retained.
 Capability entitlement is separate from C1 authority, topology and participant privacy.
@@ -1341,8 +1341,8 @@ needed for current authorities. Existing delegation rows are preserved until exp
 revocation. Authority never grants access to another user's private conversation.
 `customer_type`, workspace ownership, staff and superuser flags grant no Chat authority.
 No schema, dependency, ticket/protocol or notification/read lifecycle change is introduced.
-Chat (E2), Collaboration (E3) and cross-consultant Matching (E4) use central Team-only
-capabilities. Own Matching remains Core; Daily Tasks is Core and composes capability-filtered source projections (E5).
+Chat (F1), Collaboration (F2) and cross-consultant Matching (F3) use central Team-only
+capabilities. Own Matching remains Core; Daily Tasks is Core and composes capability-filtered source projections (F4).
 
 
 ### Internal Chat Phase 4B — General Group Foundation
@@ -1413,7 +1413,7 @@ history provide best-effort recovery. There is no replay/outbox/backfill.
 
 No Notifications, read/unread state, receipts, membership, media, settings commands, schema
 or dependency changes. Private/announcement protocols and centralized Chat authority remain
-unchanged; E2 now enforces the central Chat capability independently of C1 authority.
+unchanged; F1 now enforces `general_group` independently of C1 authority.
 
 ### Phase C4 — User and Range authority consumption
 Workspace-global user lists/detail, supported user creation/profile/activation and
@@ -1423,7 +1423,7 @@ valid multi-team authority is the unique Agency Manager. Personal, NULL and inva
 topology grant no global authority. No owner/customer_type/staff/superuser shortcut
 remains. Owner is still a protected lifecycle target, not an administrator.
 Non-authority Range Managers retain self/local consultant visibility and existing
-exactly-one-active-Range consultant creation/update/add/remove rules. Invalid global Team topology does not erase valid local scope; E6 denies NULL
+exactly-one-active-Range consultant creation/update/add/remove rules. Invalid global Team topology does not erase valid local scope; F5 denies NULL
 product mode through the central management capability checks. Personal legacy managers receive
 no organizational administration surface. Consultants retain membership-scoped
 Range reads; owner flags confer no global Range/roster visibility.
@@ -1438,3 +1438,10 @@ managerless Range can therefore require a later controlled repair workflow; ordi
 global APIs cannot bootstrap/repair an already invalid topology.
 No capability layer, schema migration or Personal setup workflow is introduced.
 Other domains and canonical geography remain unchanged.
+
+
+Phase E covers the completed Capability Foundation only. Phase F consumers are:
+F1 Chat family, F2 Collaboration, F3 cross-consultant Matching, F4 Daily Tasks,
+F5 User/Range Management, and F6 Notifications. Chat-family entitlement uses distinct
+IDs: private Chat `chat`, Announcements `announcements`, General Group `general_group`.
+These product checks remain separate from authentication, C1 authority and participant access.

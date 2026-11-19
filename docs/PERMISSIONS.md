@@ -32,7 +32,7 @@ C4 removes owner-based broad Range and roster reads; owner lifecycle protection 
 ## CURRENT IMPLEMENTED PERMISSIONS
 Domain sections below describe current behavior unless explicitly marked future. Chat
 and Collaboration use central Team-only capabilities, as does cross-consultant Matching.
-Own Matching remains Core; Daily Tasks is Core and composes capability-filtered source projections (E5). NULL mode does not deny authentication.
+Own Matching remains Core; Daily Tasks is Core and composes capability-filtered source projections (F4). NULL mode does not deny authentication.
 
 Current general authorization layers (domain-specific policies apply):
 1. Authentication
@@ -545,7 +545,7 @@ realtime while still receiving no self-Notification. Delivery is after commit an
 REST history and Notification Center remain independent recovery sources. No replay or receipts.
 
 
-### Chat Team-only capability policy (Phase E2)
+### Chat Team-only capability policy (Phase F1)
 
 Chat availability uses the central `resolve_workspace_capability(workspace, "chat")`
 policy. Team is product-eligible without requiring manager presence. Personal and NULL
@@ -569,7 +569,7 @@ Ordinary Chat may be available in Team without canonical management authority.
 Retained delegation permits publishing only while Chat capability is allowed.
 Every current-state recheck remains; no ticket/protocol change or participant privacy
 bypass is introduced. Chat is the first capability consumer; no other feature consumer
-is migrated in E2. No schema change is required.
+is migrated in F1. No schema change is required.
 
 Delegation remains limited to active same-Workspace Range Managers/Secretaries and is not
 needed for current authorities. Existing delegation rows are preserved until explicit
@@ -672,7 +672,7 @@ valid multi-team authority is the unique Agency Manager. Personal, NULL and inva
 topology grant no global authority. No owner/customer_type/staff/superuser shortcut
 remains. Owner is still a protected lifecycle target, not an administrator.
 Non-authority Range Managers retain self/local consultant visibility and existing
-exactly-one-active-Range consultant creation/update/add/remove rules. Invalid global Team topology does not erase valid local scope; E6 denies NULL
+exactly-one-active-Range consultant creation/update/add/remove rules. Invalid global Team topology does not erase valid local scope; F5 denies NULL
 product mode through the central management capability checks. Personal legacy managers receive
 no organizational administration surface. Consultants retain membership-scoped
 Range reads; owner flags confer no global Range/roster visibility.
@@ -721,7 +721,7 @@ PATCH remains protected. User creation cannot fill an active managerless Range;
 unassigned manager candidates and existing supported non-manager roles remain
 creatable. Profile changes, consultant membership, local Range Manager scope and
 inactive Range preparation retain their existing policies without blanket global
-D2a validation. Invalid Team topology does not erase valid local scope; E6 denies NULL product mode.
+D2a validation. Invalid Team topology does not erase valid local scope; F5 denies NULL product mode.
 Owner/customer_type/staff/superuser confer no authority. Foreign/missing resources
 remain non-disclosing and internal topology codes map to Persian API validation.
 
@@ -732,7 +732,7 @@ No generic repair, automatic successor/role conversion, capability gating or sch
 migration is introduced.
 
 
-### Phase E3 — Collaboration capability integration
+### Phase F2 — Collaboration capability integration
 
 The shared Collaboration service actor boundary requires the central `collaboration`
 capability under its existing Workspace-first lock. Team is eligible; Personal and NULL
@@ -741,11 +741,11 @@ stored and becomes accessible again only when capability and existing participan
 allow it. Owner/staff/superuser and purchaser metadata confer no entitlement.
 Participant scope, tenant privacy, status transitions, duplicate suppression and existing
 notification/Matching side effects are unchanged for eligible Team operations. C1 authority
-is unchanged. Chat + Collaboration + cross-consultant Matching are migrated; Daily Tasks is Core and composes capability-filtered source projections (E5).
+is unchanged. Chat + Collaboration + cross-consultant Matching are migrated; Daily Tasks is Core and composes capability-filtered source projections (F4).
 No model, migration or new API is introduced.
 
 
-### Phase E4 — Cross-consultant Matching capability
+### Phase F3 — Cross-consultant Matching capability
 
 Matching uses `cross_consultant_matching` only for different-owner File/Customer pairs.
 Personal/NULL exclude cross-owner live and weak candidates; Team retains existing scope
@@ -753,13 +753,13 @@ and privacy checks. Own Matching, MatchingProfile and own recommendation lifecyc
 Core in Personal + Team. Pure scoring/formulas and restricted serializers are unchanged.
 Generation excludes unentitled new pairs and reconciles retained historical rows as not
 current; viewer scopes deny cross-owner history immediately while entitlement is absent.
-Allowed live cross-owner results alone can carry collaboration references; E3 redemption
+Allowed live cross-owner results alone can carry collaboration references; F2 redemption
 rules are unchanged. Chat + Collaboration + cross-consultant Matching are migrated;
 Daily Tasks is Core and consumes capability-filtered Matching and Collaboration
-projections (E5). No model fields, schema, migrations or authority semantics change.
+projections (F4). No model fields, schema, migrations or authority semantics change.
 
 
-### Phase E5 — Daily Tasks source capability composition
+### Phase F4 — Daily Tasks source capability composition
 
 Daily Tasks remains Core; no new Daily Tasks capability class or Team-only gate is added.
 Its Workspace-locked aggregation composes the authoritative recommendation viewer scope,
@@ -772,7 +772,7 @@ Ordering, Jalali timestamps, privacy, score isolation, read-only feed behavior a
 bounds remain unchanged. No model/migration, source lifecycle or ManualTask behavior changes.
 
 
-### Phase E6 — Management capability enforcement
+### Phase F5 — Management capability enforcement
 
 Customer User list/detail/create/update/activity paths require `user_management`.
 Range list/detail/roster/membership and structural create/update/activity/manager-change,
@@ -785,12 +785,12 @@ owner/customer_type/staff/superuser capability bypass exists.
 
 No distinct customer Workspace-administration consumer exists in this scope beyond
 User/Range surfaces; `workspace_administration` remains a defined capability without a
-fabricated endpoint. Geography/Chat administrative consumers are outside E6. Trusted
+fabricated endpoint. Geography/Chat administrative consumers are outside F5. Trusted
 internal provisioning, topology transitions and reviewed repair retain their existing
 contracts without customer capability gates. No model/schema/migration change.
 
 
-### Phase E7 � Notification source capability revalidation
+### Phase F6 � Notification source capability revalidation
 
 Notification Center remains Core in Personal and Team; existing Core notification
 access also remains available for unresolved mode. Publication and all recipient
@@ -805,3 +805,10 @@ from read-all while entitlement is unavailable. Source links still enforce sourc
 authorization/privacy; notification entitlement grants no source permission or score access.
 Checks use bounded queries without hydrating private source data. No model/schema change,
 new notification producer, or duplicated source authorization is introduced.
+
+
+Phase E covers the completed Capability Foundation only. Phase F consumers are:
+F1 Chat family, F2 Collaboration, F3 cross-consultant Matching, F4 Daily Tasks,
+F5 User/Range Management, and F6 Notifications. Chat-family entitlement uses distinct
+IDs: private Chat `chat`, Announcements `announcements`, General Group `general_group`.
+These product checks remain separate from authentication, C1 authority and participant access.

@@ -190,3 +190,29 @@ def test_realtime_topology_revocation_connect_delivery_and_send(people, history,
         realtime.send_command({'user': people.owner.pk, 'workspace': people.workspace.pk,
                                'conversation': row.pk}, 'ممنوع')
     assert Message.objects.count() == 1
+
+
+@pytest.mark.parametrize('module,capability', [
+    ('apps.chat.services', 'chat'),
+    ('apps.chat.announcement_services', 'announcements'),
+    ('apps.chat.general_group_services', 'general_group'),
+])
+def test_family_boundary_uses_exact_capability(people, module, capability):
+    from importlib import import_module
+    from unittest.mock import patch
+    from rest_framework.exceptions import PermissionDenied
+    from django.db import transaction
+
+    boundary = import_module(module)
+    # Deny at entitlement so later authority/group rules cannot mask the ID used.
+    with patch('apps.chat.policies.resolve_workspace_capability') as resolve:
+        resolve.return_value.allowed = False
+        with pytest.raises(PermissionDenied), transaction.atomic():
+            if capability == 'chat':
+                boundary.lock_actor(people.owner)
+            elif capability == 'announcements':
+                boundary.publish_announcement(actor=people.owner, text='test')
+            else:
+                boundary.require_general_group_access(people.owner)
+        assert resolve.call_args.args[1] == capability
+        resolve.assert_called_once()

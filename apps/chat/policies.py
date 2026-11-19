@@ -9,15 +9,15 @@ from apps.organizations.capabilities import resolve_workspace_capability
 from apps.organizations.models import Workspace
 
 
-def chat_is_available(workspace_id):
+def chat_is_available(workspace_id, *, capability="chat"):
     """Product entitlement only; actor/Workspace activity is checked separately."""
-    return bool(workspace_id) and resolve_workspace_capability(Workspace(pk=workspace_id), "chat").allowed
+    return bool(workspace_id) and resolve_workspace_capability(Workspace(pk=workspace_id), capability).allowed
 
 
-def require_chat_access(actor):
+def require_chat_access(actor, *, capability="chat"):
     """Actor is freshly loaded by the Workspace-first lock_actor boundary."""
     if (not customer_can_authenticate(actor) or actor.role not in User.Role.values
-            or not chat_is_available(actor.workspace_id)):
+            or not chat_is_available(actor.workspace_id, capability=capability)):
         raise PermissionDenied(_('دسترسی به گفتگو مجاز نیست.'))
 
 

@@ -25,7 +25,7 @@ def group_name(workspace_id):
 
 @transaction.atomic
 def create_ticket(*, actor):
-    actor = lock_actor(actor)
+    actor = lock_actor(actor, capability="announcements")
     return signing.dumps({'user': str(actor.pk), 'workspace': str(actor.workspace_id),
                           'purpose': 'announcement'}, salt=TICKET_SALT)
 
@@ -46,7 +46,7 @@ def authorized_actor(claims):
     actor = User.objects.filter(pk=claims['user'], workspace_id=claims['workspace']).first()
     if actor is None:
         raise PermissionDenied()
-    return lock_actor(actor)
+    return lock_actor(actor, capability="announcements")
 
 
 @transaction.atomic

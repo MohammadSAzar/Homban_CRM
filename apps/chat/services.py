@@ -20,12 +20,12 @@ from .policies import require_chat_access
 logger = logging.getLogger(__name__)
 
 
-def lock_actor(actor):
+def lock_actor(actor, *, capability="chat"):
     workspace = Workspace.objects.select_for_update().filter(pk=actor.workspace_id, is_active=True).first()
     user = User.objects.select_for_update().filter(pk=actor.pk, workspace=workspace).first() if workspace else None
     if user is not None:
         user.workspace = workspace
-    require_chat_access(user)
+    require_chat_access(user, capability=capability)
     return user
 
 
