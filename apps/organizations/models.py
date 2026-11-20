@@ -3,6 +3,7 @@ import uuid
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 from apps.matching.generation_events import track_save
+from .custom_admin_catalog import AdminPermission
 
 
 class Workspace(models.Model):
@@ -103,4 +104,33 @@ class Workspace(models.Model):
 
     def __str__(self):
         return self.name
+
+
+class CustomAdminGrant(models.Model):
+    """Current delegation state, not an audit history. Revoke by deletion."""
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    workspace = models.ForeignKey(Workspace, on_delete=models.CASCADE, verbose_name=_("مجموعه"))
+    user = models.ForeignKey("accounts.User", on_delete=models.CASCADE, related_name="custom_admin_grants", verbose_name=_("کاربر"))
+    permission = models.CharField(max_length=32, choices=AdminPermission.choices, verbose_name=_("مجوز"))
+    granted_by = models.ForeignKey("accounts.User", on_delete=models.PROTECT, related_name="issued_custom_admin_grants", verbose_name=_("اعطاکننده"))
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name=_("زمان اعطا"))
+
+    class Meta:
+        verbose_name = _("مجوز مدیریت سفارشی")
+        verbose_name_plural = _("مجوزهای مدیریت سفارشی")
+        constraints = [
+            models.UniqueConstraint(fields=("workspace", "user", "permission"), name="unique_custom_admin_grant"),
+            models.CheckConstraint(condition=models.Q(permission__in=AdminPermission.values), name="valid_custom_admin_permission"),
+        ]
+
+    def clean(self):
+        from django.core.exceptions import ValidationError
+        super().clean()
+        for field in ("user", "granted_by"):
+            if getattr(self, field + "_id") and getattr(self, field).workspace_id != self.workspace_id:
+                raise ValidationError({field: _("کاربر باید متعلق به همین مجموعه باشد.")})
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        return super().save(*args, **kwargs)
 

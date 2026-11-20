@@ -577,7 +577,7 @@ through `set_region_mode`, under its Workspace lock and existing C1 authority.
 Personal/NULL are denied without purchaser/owner/staff/superuser bypass; Team
 eligibility does not grant authority. Read-only settings and City/Region APIs
 retain their policies; these are not map territory assignment.
-`custom_admin_permissions`: no current consumer; reserved for Custom Admin.
+`custom_admin_permissions`: reserved at F7 closure; CA1 now implements its delegation consumer below.
 `global_reporting`: no current consumer; reserved for reporting.
 `map_territory_assignment`: no current consumer; reserved for the Map feature.
 Framework `/admin/` remains internal/operator administration. Internal provisioning,
@@ -585,3 +585,33 @@ repair and F5 User/Range paths are unchanged. This supersedes F5's no-distinct-a
 consumer note: F7 identifies the existing location configuration mutation.
 No endpoint, model or migration is added. F7 completes planned Phase F consumer
 migration, subject to closure review. Phase G has not started.
+
+
+### Custom Admin CA1 - Permission foundation
+
+Custom Admin is customer delegation, separate from Django/operator admin and C1.
+The closed catalog is `manage_users`, `manage_ranges`, `manage_workspace_settings`.
+`custom_admin_permissions` is now consumed by CA1: Personal/NULL fail closed;
+Team eligibility still requires canonical C1 authority for grant management.
+GET `/api/v1/custom-admin/permissions/` exposes IDs and translated labels to eligible
+Team users. GET/POST `/api/v1/custom-admin/grants/` and DELETE
+`/api/v1/custom-admin/grants/<uuid>/` are authority-only. POST accepts only `user_id`
+and `permission`; Workspace, grantor and creation timestamp are server-owned.
+No PATCH or recursive delegation exists. Active local users of existing customer
+roles are eligible; authority self-grants are rejected. Grant responses include only
+user ID/username/name, permission/display, grant ID and creation time.
+CustomAdminGrant stores current state, not audit history; revocation deletes the row.
+A schema-only migration adds UUID/FKs/timestamp and unique Workspace/user/permission
+and closed-permission constraints. Model validation checks same-Workspace FKs;
+supported writes serialize Workspace -> local Users ordered by PK -> grant rows.
+Raw ORM/SQL bypass is not a customer write interface.
+The read helper reloads actor state, requires active user/Workspace and capability,
+then resolves C1: canonical authority is allowed, otherwise an exact local grant is
+required. Invalid authority state fails closed. Inactive/moved users and mode changes
+suspend access without deleting grants; grants remain current state across authority
+handoff. Grantor membership must still match the Workspace. No purchaser/owner/staff/
+superuser flag grants customer authorization. Future mutation consumers must recheck
+under their existing transaction boundary and still enforce their own capability,
+organizational scope, ownership, action and sensitive-field policies.
+CA1 does not integrate grants into User/Range/Location or other consumers. CA2+ owns
+that integration. Existing topology, repair/provisioning and Django admin are unchanged.
