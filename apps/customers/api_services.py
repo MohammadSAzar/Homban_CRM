@@ -42,10 +42,8 @@ def get_scoped_customer(actor, customer_id, *, lock=False):
         raise NotFound(_("مشتری یافت نشد.")) from None
 
 
-@transaction.atomic
-def save_customer(*, actor, data, customer_id=None):
-    actor = lock_actor(actor)
-    item = get_scoped_customer(actor, customer_id, lock=True) if customer_id else None
+def prepare_write_fields(*, actor, data, item=None):
+    """Shared, read-only canonical assignment/reference resolution."""
     reject_extra_fields(data, set(WRITE_FIELDS))
     fields = dict(data)
     reasons = fields.pop("valuable_reasons", None)
@@ -63,6 +61,14 @@ def save_customer(*, actor, data, customer_id=None):
         ))
         if len(regions) != len(set(region_ids)):
             raise ValidationError({"preferred_regions": _("مناطق انتخاب‌شده معتبر نیستند.")})
+    return fields, reasons, regions
+
+
+@transaction.atomic
+def save_customer(*, actor, data, customer_id=None):
+    actor = lock_actor(actor)
+    item = get_scoped_customer(actor, customer_id, lock=True) if customer_id else None
+    fields, reasons, regions = prepare_write_fields(actor=actor, data=data, item=item)
     try:
         if item is None:
             return create_customer(
@@ -85,3 +91,18 @@ def save_customer(*, actor, data, customer_id=None):
         return item
     except ModelValidationError as error:
         raise ValidationError(error.message_dict) from error
+
+
+def validate_customer_creation(*, actor, data):
+    """Read-only canonical aggregate preview, including pending region preferences."""
+    from .validators import validate_region_set
+    require_customer_actor(actor)
+    fields, reasons, regions = prepare_write_fields(actor=actor, data=data)
+    item = Customer(workspace=actor.workspace, **fields)
+    item._pending_region_ids = {region.pk for region in regions or ()}
+    item.full_clean()
+    validate_region_set(actor.workspace_id, item._pending_region_ids, set())
+    for reason in reasons or ():
+        CustomerValuableReason(customer=item, reason=reason).full_clean(exclude=["customer"])
+    if len(reasons or ()) != len(set(reasons or ())):
+        raise ValidationError({"valuable_reasons": _("دلایل تکراری مجاز نیستند.")})

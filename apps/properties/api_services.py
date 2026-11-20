@@ -50,10 +50,8 @@ def replace_reasons(item, reasons):
         PropertyFileValuableReason.objects.create(property_file=item, reason=reason)
 
 
-@transaction.atomic
-def save_file(*, actor, data, file_id=None):
-    actor = lock_actor(actor)
-    item = get_scoped_file(actor, file_id, lock=True) if file_id else None
+def prepare_write_fields(*, actor, data, item=None):
+    """Shared, read-only canonical assignment/reference resolution."""
     reject_extra_fields(data, set(WRITE_FIELDS))
     fields = dict(data)
     reasons = fields.pop("valuable_reasons", None)
@@ -69,6 +67,14 @@ def save_file(*, actor, data, file_id=None):
             if target is None:
                 raise ValidationError({key: _("مکان انتخاب‌شده معتبر نیست.")})
             fields[key] = target
+    return fields, reasons
+
+
+@transaction.atomic
+def save_file(*, actor, data, file_id=None):
+    actor = lock_actor(actor)
+    item = get_scoped_file(actor, file_id, lock=True) if file_id else None
+    fields, reasons = prepare_write_fields(actor=actor, data=data, item=item)
     try:
         if item is None:
             return create_property_file(workspace=actor.workspace, valuable_reasons=reasons or (), **fields)
@@ -115,3 +121,15 @@ def reorder_images(*, actor, file_id, order):
     for position, image_id in enumerate(order):
         images[image_id].sort_order = position
     PropertyFileImage.objects.bulk_update(images.values(), ["sort_order"])
+
+
+def validate_file_creation(*, actor, data):
+    """Read-only preview using the same scope, model and child validators as creation."""
+    require_property_actor(actor)
+    fields, reasons = prepare_write_fields(actor=actor, data=data)
+    item = PropertyFile(workspace=actor.workspace, **fields)
+    item.full_clean()
+    for reason in reasons or ():
+        PropertyFileValuableReason(property_file=item, reason=reason).full_clean(exclude=["property_file"])
+    if len(reasons or ()) != len(set(reasons or ())):
+        raise ValidationError({"valuable_reasons": _("دلایل تکراری مجاز نیستند.")})

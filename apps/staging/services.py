@@ -1,7 +1,7 @@
 """Internal DS1 boundary, not a customer API or reviewer authorization policy.
 
 Trusted callers provide explicit Workspace IDs. Actor mode derives Workspace from
-current actor context and permits only creator writes. No canonical conversion.
+current actor context. DS2 uses the same review scope for actor writes.
 """
 from copy import deepcopy
 from django.db import transaction
@@ -52,11 +52,13 @@ def _record(*, record_id, workspace_id, actor):
     workspace, current = _context(workspace_id=workspace_id, actor=actor)
     rows = StagedRecord.objects.select_for_update().filter(pk=record_id, workspace=workspace)
     if actor is not None:
-        rows = rows.filter(created_by=current)
+        from .policies import review_scope
+        current.workspace = workspace
+        rows = review_scope(current, rows)
     row = rows.first()
     if row is None:
         raise NotFound(_("پیش‌نویس یافت نشد."))
-    if row.status == StagedRecord.Status.REJECTED:
+    if row.status in (StagedRecord.Status.REJECTED, StagedRecord.Status.CONVERTED):
         raise ValidationError({"status": _("پیش‌نویس ردشده قابل تغییر نیست.")})
     return row
 

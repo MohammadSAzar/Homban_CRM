@@ -138,6 +138,8 @@ def test_foreign_and_missing_ids_indistinguishable(world):
             update_staged_record(actor=actor, record_id=identifier, data={})
         with pytest.raises(NotFound):
             reject_staged_record(workspace_id=ws.pk, record_id=identifier)
+    # DS2 Personal review is workspace-wide; creator-only isolation applies in Team.
+    Workspace.objects.filter(pk=ws.pk).update(workspace_mode="team")
     other = User.objects.create_user(username="sibling", workspace=ws)
     local = create(world)
     with pytest.raises(NotFound):
