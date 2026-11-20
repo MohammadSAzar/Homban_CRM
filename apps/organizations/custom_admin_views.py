@@ -4,8 +4,8 @@ from rest_framework.views import APIView
 from django.utils.translation import gettext_lazy as _
 
 from apps.accounts.user_serializers import StrictInputSerializer
-from .custom_admin_catalog import AdminPermission
-from .custom_admin_policy import require_custom_admin_access, require_grant_authority
+from .custom_admin_catalog import AdminPermission, permission_metadata
+from .custom_admin_policy import require_custom_admin_access, require_grant_authority, custom_admin_current_state
 from .custom_admin_services import create_grant, revoke_grant, list_grants
 
 
@@ -15,16 +15,24 @@ class GrantInput(StrictInputSerializer):
 
 
 def grant_data(row):
+    metadata = permission_metadata(row.permission)
+    if metadata is None:
+        from rest_framework.exceptions import PermissionDenied
+        raise PermissionDenied(_("مجوز نامعتبر است."))
     return {"id": str(row.pk), "user": {"id": str(row.user_id), "username": row.user.username,
             "first_name": row.user.first_name, "last_name": row.user.last_name},
-            "permission": row.permission, "permission_display": str(row.get_permission_display()),
+            "permission": row.permission, "permission_display": metadata["label"],
             "created_at": row.created_at.isoformat()}
 
 
 class PermissionCatalogView(APIView):
     def get(self, request):
         require_custom_admin_access(request.user)
-        return Response([{"permission": key, "display": str(label)} for key, label in AdminPermission.choices])
+        return Response([
+            {"permission": key, "display": metadata["label"], **metadata}
+            for key in AdminPermission.values
+            for metadata in (permission_metadata(key),)
+        ])
 
 
 class GrantListView(APIView):
@@ -43,3 +51,8 @@ class GrantDetailView(APIView):
     def delete(self, request, pk):
         revoke_grant(actor=request.user, grant_id=pk)
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class CustomAdminMeView(APIView):
+    def get(self, request):
+        return Response(custom_admin_current_state(request.user))

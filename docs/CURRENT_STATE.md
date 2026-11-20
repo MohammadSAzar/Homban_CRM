@@ -1447,3 +1447,16 @@ that integration. Existing topology, repair/provisioning and Django admin are un
 - `manage_workspace_settings` delegates only `set_region_mode` (PATCH /api/v1/location-settings/), independently requiring `workspace_administration`. City/Region management and read behavior are unchanged.
 - Consumers reuse the CA1 current-state permission helper; grants do not redefine C1 authority. Workspace-first writes recheck authorization; revoked grants, inactive actors/workspaces, changed tenancy, lost scope, and Personal/NULL mode fail closed. No owner/customer_type/staff/superuser bypass is added.
 - Custom Admin grant administration remains canonical-authority-only; no recursive delegation. Feature capabilities, scope, topology and action restrictions remain independent. No schema/migration change. CA2 tests await external verification.
+
+
+### Custom Admin CA3: backend read contract
+
+Custom Admin backend implementation is complete through CA3, pending external verification; frontend/UI remains future work. No schema or migration change.
+
+The closed catalog retains permission/display and adds id/label/status/operational. manage_users is reserved/non-operational but remains grantable and stored; future activation requires explicitly defined safe scope. manage_ranges and manage_workspace_settings are active; their CA2 scope and structural restrictions are unchanged. Metadata is code-defined, never client-controlled or stored in the database.
+
+GET /api/v1/custom-admin/me/ returns is_authority, granted_permissions, and operational_permissions. Authority is canonical C1 only, with no synthetic grants. Granted permissions are current valid local stored grants, in catalog order; operational permissions are their catalog-active subset, NOT a guarantee of action authorization or local scope. A stored manage_users grant appears only in granted_permissions.
+
+The read endpoint reloads actor/workspace state and requires custom_admin_permissions; Personal/NULL, inactivity, and unresolved authority fail closed. Revocation is immediately reflected. Foreign/malformed tenant grants and unknown permission IDs never apply. No owner/staff/superuser/customer_type bypass. No writes or cross-request permission cache.
+
+Grant-list fields remain unchanged and safe: id, minimal user identity, permission, permission_display, created_at. Labels share the central catalog; clients can join catalog metadata by permission ID. Grant administration remains authority-only. No new administrative powers or feature consumers.
