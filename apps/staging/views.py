@@ -67,3 +67,9 @@ class StagingViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, viewsets.
     def convert(self, request, pk=None):
         self._empty(request)
         return self._write(convert_staged_record)
+
+
+    @action(detail=True, methods=["get"])
+    def duplicates(self, request, pk=None):
+        from .duplicates.service import find_duplicate_candidates
+        return Response(find_duplicate_candidates(record_id=pk, actor=request.user))
