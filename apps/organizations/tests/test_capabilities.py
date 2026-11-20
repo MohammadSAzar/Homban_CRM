@@ -70,5 +70,6 @@ def test_readonly_frozen_bounded_and_not_topology_or_activity_gate(workspace):
         result.allowed = False
     with pytest.raises(TypeError):
         CAPABILITY_CLASSES["chat"] = "core"
-    assert len(CAPABILITY_CLASSES) == 20
+    assert len(CAPABILITY_CLASSES) == 21
+    assert CAPABILITY_CLASSES["staging"] == "core"
     assert not (CORE & TEAM_ONLY or CORE & TOPOLOGY_DEPENDENT_TEAM or TEAM_ONLY & TOPOLOGY_DEPENDENT_TEAM)

@@ -28,6 +28,7 @@ THIRD_PARTY_APPS = [
 
 LOCAL_APPS = [
     "apps.organizations.apps.OrganizationsConfig",
+    "apps.staging.apps.StagingConfig",
     "apps.accounts.apps.AccountsConfig",
     "apps.locations.apps.LocationsConfig",
     "apps.ranges.apps.RangesConfig",

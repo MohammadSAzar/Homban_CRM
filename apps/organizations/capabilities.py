@@ -8,7 +8,7 @@ from .models import Workspace
 
 CORE = frozenset({
     "property_files", "customers", "own_matching", "matching_profile",
-    "manual_tasks", "calendar", "notifications", "geography",
+    "manual_tasks", "calendar", "notifications", "geography", "staging",
 })
 TEAM_ONLY = frozenset({
     "chat", "announcements", "general_group", "collaboration",

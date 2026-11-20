@@ -882,3 +882,14 @@ GET /api/v1/custom-admin/me/ returns is_authority, granted_permissions, and oper
 The read endpoint reloads actor/workspace state and requires custom_admin_permissions; Personal/NULL, inactivity, and unresolved authority fail closed. Revocation is immediately reflected. Foreign/malformed tenant grants and unknown permission IDs never apply. No owner/staff/superuser/customer_type bypass. No writes or cross-request permission cache.
 
 Grant-list fields remain unchanged and safe: id, minimal user identity, permission, permission_display, created_at. Labels share the central catalog; clients can join catalog metadata by permission ID. Grant administration remains authority-only. No new administrative powers or feature consumers.
+
+
+### Draft/Staging DS1 foundation
+
+DS1 provides a separate apps/staging service/model domain for incomplete or uncertain source data. Canonical PropertyFile/Customer validation is unchanged; PropertyFile still requires a non-null Workspace Region. No canonical conversion, duplicate detection, crawler/import/API/voice integration, or review hierarchy exists in DS1. DS2 will add canonical validation/conversion/review flow.
+
+StagedRecord stores UUID, Workspace, entity_type (property_file/customer), source_type (crawler/api/import/voice), raw_payload JSON, normalized_data object, structured validation_issues (field/code/message), status, nullable created_by, and timestamps. There is no Region FK or provider-specific schema. Source provenance remains in raw_payload; no extra metadata field is needed yet. No secrets/tokens should be supplied as source payload.
+
+Staging is Core: Personal and Team eligible; NULL fails closed. Services require an active Workspace and staging capability without purchaser/owner/staff/superuser bypass. Trusted internal calls require explicit workspace_id and may use created_by=None; creator is attribution, not a global ownership policy. Actor-originated service calls derive Workspace/creator from current actor and restrict mutations to that creator. No customer API, directory, list/detail projection, or raw-payload exposure is added. Review/read authorization is deferred to DS2.
+
+Writes use Workspace-first transactions and scoped record locks. Services preserve raw_payload after creation, allow draft edits, draft->ready/rejected and ready->draft/rejected; rejected is terminal. Edits return ready records to draft. Readiness checks valid vocabulary/object data and no issues only; it does NOT certify canonical validity. Model/service validation enforces creator tenancy; closed vocabularies also have DB constraints. Schema migration: staging.0001_initial. External verification pending.
