@@ -6,19 +6,20 @@ from rest_framework.exceptions import NotFound, PermissionDenied, ValidationErro
 from apps.accounts.models import User
 from apps.organizations.models import Workspace
 from .models import City, Region
-from .policies import require_location_manager, require_workspace_administration
+from .policies import require_location_manager, require_workspace_administration, require_workspace_location_manager
 
 
-def _lock_workspace(actor):
+def _lock_workspace(actor, *, configuration=False):
     """Use the same workspace-then-user lock order as user management."""
-    require_location_manager(actor)
+    authorize = require_workspace_location_manager if configuration else require_location_manager
+    authorize(actor)
     try:
         workspace = Workspace.objects.select_for_update().get(pk=actor.workspace_id, is_active=True)
         current = User.objects.select_for_update().get(pk=actor.pk, workspace=workspace)
     except (Workspace.DoesNotExist, User.DoesNotExist):
         raise PermissionDenied(_("دسترسی به تنظیمات مکانی فعال نیست.")) from None
     current.workspace = workspace
-    require_location_manager(current)
+    authorize(current)
     return workspace
 
 
@@ -83,7 +84,7 @@ def save_region(*, actor, data, object_id=None):
 
 @transaction.atomic
 def set_region_mode(*, actor, data):
-    workspace = _lock_workspace(actor)
+    workspace = _lock_workspace(actor, configuration=True)
     require_workspace_administration(workspace)
     _validate_fields(data, {"region_mode"})
     mode = data.get("region_mode")

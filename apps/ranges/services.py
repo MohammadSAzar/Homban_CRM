@@ -13,7 +13,7 @@ from apps.organizations.topology_services import (
 )
 from apps.organizations import topology_transitions
 from .models import Range, RangeMembership
-from .policies import require_range_capability
+from .policies import require_range_capability, can_delegate_range_metadata, require_range_metadata
 
 
 def require_range_structure_authority(actor):
@@ -48,8 +48,8 @@ def _resolve_regions(actor, team, region_ids):
 @transaction.atomic
 def _save_range_ordinary(*, actor, data, range_id=None):
     actor = lock_actor(actor)
-    require_range_structure_authority(actor)
     team = _locked_range(actor, range_id) if range_id else Range(workspace_id=actor.workspace_id)
+    require_range_metadata(actor, team if range_id else None, data)
     reject_extra_fields(data, {"name", "manager", "activity_scope", "regions", "is_active"})
     if "manager" in data:
         if data["manager"] is None:
@@ -82,7 +82,7 @@ def _save_range_ordinary(*, actor, data, range_id=None):
     return team
 
 
-def _structure_actor(actor):
+def _structure_actor(actor, *, metadata_delegate=False):
     """Outer atomic caller: lock Workspace only, then reload and authorize actor.
 
     Do not use lock_actor here: D2b must lock all Users in PK order before
@@ -98,7 +98,8 @@ def _structure_actor(actor):
     if current is None:
         raise PermissionDenied(_("دسترسی مدیریت رنج فعال نیست."))
     current.workspace = workspace
-    require_range_structure_authority(current)
+    if not (metadata_delegate and can_delegate_range_metadata(current)):
+        require_range_structure_authority(current)
     return current
 
 
@@ -133,7 +134,7 @@ def _metadata(actor, team, data):
 
 @transaction.atomic
 def save_range(*, actor, data, range_id=None):
-    actor = _structure_actor(actor)
+    actor = _structure_actor(actor, metadata_delegate=True)
     # Scope path resources before payload/topology validation; no subordinate lock.
     team = None
     if range_id is not None:
@@ -141,6 +142,7 @@ def save_range(*, actor, data, range_id=None):
         if team is None:
             raise NotFound(_("رنج یافت نشد."))
     reject_extra_fields(data, {"name", "manager", "activity_scope", "regions", "is_active"})
+    require_range_metadata(actor, team, data)
     if team is None:
         intent = "create" if data.get("is_active", True) else None
     else:

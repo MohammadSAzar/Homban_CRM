@@ -25,9 +25,13 @@ def test_exact_capability_and_authority(world):
     with patch('apps.locations.policies.resolve_workspace_capability') as resolve:
         resolve.return_value.allowed = True
         set_region_mode(actor=world.actor, data={'region_mode': 'custom'})
-        resolve.assert_called_once()
-        assert resolve.call_args.args[1] == 'workspace_administration'
-        assert resolve.call_args.args[0].pk == world.workspace.pk
+        # Preflight and locked current-state authorization may both check entitlement.
+        resolve.assert_called()
+        for call in resolve.call_args_list:
+            assert len(call.args) == 2
+            assert call.args[1] == 'workspace_administration'
+            assert call.args[0].pk == world.workspace.pk
+            assert call.kwargs == {}
     User.objects.filter(pk=world.actor.pk).update(role='consultant')
     assert client_for(world.actor).patch(MODE, {'region_mode': 'divar'}, format='json').status_code == 403
     world.workspace.refresh_from_db()

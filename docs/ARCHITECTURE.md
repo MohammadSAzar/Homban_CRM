@@ -615,3 +615,13 @@ under their existing transaction boundary and still enforce their own capability
 organizational scope, ownership, action and sensitive-field policies.
 CA1 does not integrate grants into User/Range/Location or other consumers. CA2+ owns
 that integration. Existing topology, repair/provisioning and Django admin are unchanged.
+
+
+### Custom Admin CA2: scoped consumer integration
+
+- `manage_users` remains in the CA1 catalog and grant storage, with no new operational authorization effect. Existing F5 local Range Manager User Management works without grants and retains its existing scope. Future explicitly-scoped User Management expansion is deferred to CA3 or later.
+- `manage_ranges` permits only name, activity_scope, and regions metadata PATCH within the delegate's existing exactly-one-active-managed-Range scope. The exact grant and independent `range_management` capability are required. Other roles gain no Range scope.
+- Range creation, activation/deactivation, manager replacement, expansion, Agency replacement, and all structural/authority transitions remain canonical-authority-only. Delegated metadata requests containing structural fields are denied, including unchanged structural values. Existing local membership operations are unchanged.
+- `manage_workspace_settings` delegates only `set_region_mode` (PATCH /api/v1/location-settings/), independently requiring `workspace_administration`. City/Region management and read behavior are unchanged.
+- Consumers reuse the CA1 current-state permission helper; grants do not redefine C1 authority. Workspace-first writes recheck authorization; revoked grants, inactive actors/workspaces, changed tenancy, lost scope, and Personal/NULL mode fail closed. No owner/customer_type/staff/superuser bypass is added.
+- Custom Admin grant administration remains canonical-authority-only; no recursive delegation. Feature capabilities, scope, topology and action restrictions remain independent. No schema/migration change. CA2 tests await external verification.

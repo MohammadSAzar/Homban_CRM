@@ -5,7 +5,7 @@ from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from .policies import LocationPermission, visible_cities, visible_regions
+from .policies import LocationSettingsPermission, LocationPermission, visible_cities, visible_regions
 from .serializers import (
     CityFilterSerializer, CityReadSerializer, CityWriteSerializer,
     RegionFilterSerializer, RegionReadSerializer, RegionWriteSerializer,
@@ -71,7 +71,7 @@ class RegionViewSet(LocationViewSet):
 
 
 class LocationSettingsView(APIView):
-    permission_classes = [LocationPermission]
+    permission_classes = [LocationSettingsPermission]
 
     def get(self, request):
         return Response(RegionModeReadSerializer(request.user.workspace).data)

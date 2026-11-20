@@ -26,6 +26,7 @@ def scoped_range(actor, pk):
 
 
 class RangeViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, viewsets.GenericViewSet):
+    metadata_write = True
     permission_classes = [RangePermission]
     serializer_class = RangeReadSerializer
     pagination_class = RangePagination
@@ -57,6 +58,7 @@ class RangeViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, viewsets.Ge
 
 
 class RangeConsultantListView(generics.ListAPIView):
+    metadata_write = True
     permission_classes = [RangePermission]
     serializer_class = UserSummarySerializer
     pagination_class = RangePagination

@@ -5,6 +5,7 @@ from rest_framework.permissions import BasePermission, SAFE_METHODS
 from apps.accounts.authentication import customer_can_authenticate
 from apps.organizations.authority import resolve_workspace_authority
 from apps.organizations.capabilities import resolve_workspace_capability
+from apps.organizations.custom_admin_policy import has_custom_admin_permission
 from .models import City, Region
 
 
@@ -59,3 +60,22 @@ class LocationPermission(BasePermission):
 def require_workspace_administration(workspace):
     if not resolve_workspace_capability(workspace, "workspace_administration").allowed:
         raise PermissionDenied(LocationPermission.message)
+
+
+def can_configure_workspace_location(actor):
+    return bool(actor.is_authenticated and customer_can_authenticate(actor)
+                and resolve_workspace_capability(actor.workspace, "workspace_administration").allowed
+                and (can_manage_location(actor)
+                     or has_custom_admin_permission(actor, "manage_workspace_settings")))
+
+
+def require_workspace_location_manager(actor):
+    if not can_configure_workspace_location(actor):
+        raise PermissionDenied(LocationPermission.message)
+
+
+class LocationSettingsPermission(LocationPermission):
+    def has_permission(self, request, view):
+        if request.method in SAFE_METHODS:
+            return super().has_permission(request, view)
+        return can_configure_workspace_location(request.user)

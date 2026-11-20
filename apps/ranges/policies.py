@@ -6,6 +6,8 @@ from rest_framework.permissions import BasePermission, SAFE_METHODS
 from apps.accounts.authentication import customer_can_authenticate
 from apps.accounts.models import User
 from apps.accounts.policies import has_organizational_authority, is_local_range_manager
+from apps.accounts.policies import managed_range
+from apps.organizations.custom_admin_policy import has_custom_admin_permission
 from apps.locations.models import Region
 from apps.organizations.capabilities import resolve_workspace_capability
 from .models import Range, RangeMembership
@@ -23,6 +25,24 @@ def require_range_capability(actor):
     if (not actor.is_authenticated or not customer_can_authenticate(actor)
             or not resolve_workspace_capability(actor.workspace, "range_management").allowed):
         raise PermissionDenied(_("اجازه مدیریت رنج‌ها را ندارید."))
+
+
+def can_delegate_range_metadata(actor):
+    # Delegation never creates an organizational scope or canonical authority.
+    return bool(can_read_ranges(actor) and actor.role == User.Role.RANGE_MANAGER
+                and has_custom_admin_permission(actor, "manage_ranges")
+                and managed_range(actor, required=False) is not None)
+
+
+def require_range_metadata(actor, team, data):
+    require_range_capability(actor)
+    if has_organizational_authority(actor):
+        return
+    local = managed_range(actor, required=False)
+    if (not can_delegate_range_metadata(actor) or team is None or local is None
+            or team.workspace_id != actor.workspace_id or local.pk != team.pk
+            or set(data) - {"name", "activity_scope", "regions"}):
+        raise PermissionDenied(_("اجازه تغییر اطلاعات این رنج را ندارید."))
 
 
 def visible_ranges(actor):
@@ -83,4 +103,6 @@ class RangePermission(BasePermission):
             return True
         if getattr(view, "membership_write", False):
             return has_organizational_authority(actor) or is_local_range_manager(actor)
-        return has_organizational_authority(actor)
+        return (has_organizational_authority(actor) or (
+            request.method == "PATCH" and getattr(view, "metadata_write", False)
+            and can_delegate_range_metadata(actor)))
